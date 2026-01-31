@@ -1,5 +1,5 @@
-import { useState, FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
@@ -7,20 +7,38 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
+  const { signIn, isAuthenticated, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
+
+  // Redirect when authenticated - handles both initial auth check and post-login
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate('/', { replace: true })
+    }
+  }, [isAuthenticated, authLoading, navigate])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
-    const { error } = await signIn(email, password)
+    const { error, session } = await signIn(email, password)
     
     if (error) {
       setError(error.message)
+      setLoading(false)
     }
-    
-    setLoading(false)
+    // Don't set loading to false on success - let the useEffect handle redirect
+    // This prevents showing the form briefly before redirect
+  }
+
+  // Show loading state while checking initial auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    )
   }
 
   return (
@@ -38,23 +56,12 @@ export default function Login() {
             </Link>
           </p>
         </div>
-
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800">{error}</p>
-                </div>
-              </div>
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              {error}
             </div>
           )}
-
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -68,11 +75,10 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="name@dabdoob.com"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                placeholder="you@example.com"
               />
             </div>
-
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
@@ -85,19 +91,21 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Enter your password"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                placeholder="********"
               />
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
