@@ -630,5 +630,6 @@ export default function SwapRequestDetail() {
           </div>
         </div>
       </div>
-
-      
+    </div>
+  )
+}
