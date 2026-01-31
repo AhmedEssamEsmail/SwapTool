@@ -79,87 +79,30 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          } />
-          <Route path="/signup" element={
-            <PublicRoute>
-              <Signup />
-            </PublicRoute>
-          } />
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/shifts" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/leave-requests" element={
-            <ProtectedRoute>
-              <LeaveRequests />
-            </ProtectedRoute>
-          } />
-          <Route path="/leave-requests/new" element={
-            <ProtectedRoute>
-              <CreateLeaveRequest />
-            </ProtectedRoute>
-          } />
-          <Route path="/leave-requests/create" element={
-            <ProtectedRoute>
-              <CreateLeaveRequest />
-            </ProtectedRoute>
-          } />
-          <Route path="/leave-requests/:id" element={
-            <ProtectedRoute>
-              <LeaveRequestDetail />
-            </ProtectedRoute>
-          } />
-          <Route path="/swap-requests" element={
-            <ProtectedRoute>
-              <SwapRequests />
-            </ProtectedRoute>
-          } />
-          <Route path="/swap-requests/new" element={
-            <ProtectedRoute>
-              <CreateSwapRequest />
-            </ProtectedRoute>
-          } />
-          <Route path="/swap-requests/create" element={
-            <ProtectedRoute>
-              <CreateSwapRequest />
-            </ProtectedRoute>
-          } />
-          <Route path="/swap-requests/:id" element={
-            <ProtectedRoute>
-              <SwapRequestDetail />
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <WFMOnlyRoute>
-              <Settings />
-            </WFMOnlyRoute>
-          } />
-          <Route path="/schedule" element={
-            <ProtectedRoute>
-              <Schedule />
-            </ProtectedRoute>
-          } />
-          <Route path="/schedule/upload" element={
-            <WFMOnlyRoute>
-              <ScheduleUpload />
-            </WFMOnlyRoute>
-          } />
-          <Route path="/leave-balances" element={
-            <ProtectedRoute>
-              <LeaveBalances />
-            </ProtectedRoute>
-          } />
+          {/* Public routes */}
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+          
+          {/* Protected routes */}
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/schedule" element={<ProtectedRoute><Schedule /></ProtectedRoute>} />
+          <Route path="/swap-requests" element={<ProtectedRoute><SwapRequests /></ProtectedRoute>} />
+          <Route path="/swap-requests/new" element={<ProtectedRoute><CreateSwapRequest /></ProtectedRoute>} />
+          <Route path="/swap-requests/:id" element={<ProtectedRoute><SwapRequestDetail /></ProtectedRoute>} />
+          <Route path="/leave-requests" element={<ProtectedRoute><LeaveRequests /></ProtectedRoute>} />
+          <Route path="/leave-requests/new" element={<ProtectedRoute><CreateLeaveRequest /></ProtectedRoute>} />
+          <Route path="/leave-requests/:id" element={<ProtectedRoute><LeaveRequestDetail /></ProtectedRoute>} />
+          <Route path="/leave-balances" element={<ProtectedRoute><LeaveBalances /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          
+          {/* WFM only routes */}
+          <Route path="/schedule/upload" element={<WFMOnlyRoute><ScheduleUpload /></WFMOnlyRoute>} />
+          
+          {/* Redirect root to dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          {/* Catch all - redirect to dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
     </AuthProvider>
