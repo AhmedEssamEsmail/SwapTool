@@ -36,6 +36,8 @@ const roleColors: Record<string, string> = {
 
 interface ShiftWithUser extends Shift {
   user?: User
+  original_user_id?: string
+  swapped_with_user_id?: string
 }
 
 interface CommentWithSystem extends Comment {
@@ -536,13 +538,13 @@ export default function SwapRequestDetail() {
           <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
               request.tl_approved_at ? 'bg-green-100 text-green-600' :
-              request.status === 'rejected' && request.status !== 'pending_acceptance' ? 'bg-red-100 text-red-600' :
+              request.status === 'rejected' ? 'bg-red-100 text-red-600' :
               request.status === 'pending_tl' ? 'bg-yellow-100 text-yellow-600' :
               'bg-gray-100 text-gray-400'
             }`}>
               {request.tl_approved_at ? (
                 <span className="text-sm font-bold">\u2713</span>
-              ) : request.status === 'rejected' && request.status !== 'pending_acceptance' ? (
+              ) : request.status === 'rejected' ? (
                 <span className="text-sm font-bold">\u2717</span>
               ) : request.status === 'pending_tl' ? (
                 <span className="text-sm font-bold">...</span>
