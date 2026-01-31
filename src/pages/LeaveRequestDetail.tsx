@@ -357,9 +357,9 @@ export default function LeaveRequestDetail() {
                 step.status === 'skipped' ? 'bg-gray-300 text-gray-500' :
                 'bg-gray-200 text-gray-500'
               }`}>
-                {step.status === 'completed' ? 'â' :
-                 step.status === 'rejected' ? 'â' :
-                 step.status === 'skipped' ? 'â' :
+                {step.status === 'completed' ? '✓' :
+                 step.status === 'rejected' ? '✗' :
+                 step.status === 'skipped' ? '−' :
                  step.status === 'pending' ? '...' :
                  index + 1}
               </div>
