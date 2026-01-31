@@ -22,7 +22,7 @@ export default function Login() {
     setError(null)
     setLoading(true)
 
-    const { error, session } = await signIn(email, password)
+    const { error, session: _session } = await signIn(email, password)
     
     if (error) {
       setError(error.message)
