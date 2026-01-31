@@ -37,12 +37,20 @@ const leaveLabels: Record<LeaveType, string> = {
 
 // Mapping from display labels to database enum values
 const labelToLeaveTypeEnum: Record<string, LeaveType> = {
+  // Short labels used in leaveLabels
   'Sick': 'sick',
   'Annual': 'annual',
   'Casual': 'casual',
   'Holiday': 'public_holiday',
+  'Bereav.': 'bereavement',
   'Bereavement': 'bereavement',
-  // Also map the lowercase versions (for cases where name is already correct)
+  // Full labels from database/defaults
+  'Sick Leave': 'sick',
+  'Annual Leave': 'annual',
+  'Casual Leave': 'casual',
+  'Public Holiday': 'public_holiday',
+  'Bereavement Leave': 'bereavement',
+  // Lowercase enum values (for direct matches)
   'sick': 'sick',
   'annual': 'annual',
   'casual': 'casual',
@@ -50,12 +58,12 @@ const labelToLeaveTypeEnum: Record<string, LeaveType> = {
   'bereavement': 'bereavement',
 }
 
-const defaultLeaveTypes: { name: string; label: string }[] = [
-  { name: 'sick', label: 'Sick Leave' },
-  { name: 'annual', label: 'Annual Leave' },
-  { name: 'casual', label: 'Casual Leave' },
-  { name: 'public_holiday', label: 'Public Holiday' },
-  { name: 'bereavement', label: 'Bereavement Leave' },
+const defaultLeaveTypes: { label: string }[] = [
+  { label: 'Sick Leave' },
+  { label: 'Annual Leave' },
+  { label: 'Casual Leave' },
+  { label: 'Public Holiday' },
+  { label: 'Bereavement Leave' },
 ]
 
 interface ShiftWithSwap extends Shift {
@@ -77,14 +85,14 @@ export default function Schedule() {
   // Shift editing state
   const [editingShift, setEditingShift] = useState<{ userId: string; date: string; shiftId?: string; existingLeave?: LeaveRequest | null } | null>(null)
   const [selectedShiftType, setSelectedShiftType] = useState<ShiftType>('AM')
-  const [selectedLeaveType, setSelectedLeaveType] = useState<LeaveType | null>(null)
+  const [selectedLeaveType, setSelectedLeaveType] = useState<string | null>(null)
   const [savingShift, setSavingShift] = useState(false)
   
   // Leave types state
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeConfig[]>([])
   const [loadingLeaveTypes, setLoadingLeaveTypes] = useState(false)
   const [editingLeaveType, setEditingLeaveType] = useState<LeaveTypeConfig | null>(null)
-  const [newLeaveType, setNewLeaveType] = useState({ name: '', label: '', is_active: true })
+  const [newLeaveType, setNewLeaveType] = useState({ label: '', is_active: true })
   const [showAddLeaveType, setShowAddLeaveType] = useState(false)
 
   const canEdit = user?.role === 'tl' || user?.role === 'wfm'
@@ -195,7 +203,6 @@ export default function Schedule() {
         console.log('Leave types table not found, using defaults')
         setLeaveTypes(defaultLeaveTypes.map((lt, i) => ({ 
           id: `default-${i}`, 
-          name: lt.name, 
           label: lt.label, 
           is_active: true,
           created_at: new Date().toISOString()
@@ -371,8 +378,8 @@ export default function Schedule() {
   }
 
   async function addLeaveType() {
-    if (!newLeaveType.name || !newLeaveType.label) {
-      alert('Please fill in both name and label')
+    if (!newLeaveType.label) {
+      alert('Please fill in the label')
       return
     }
 
@@ -387,7 +394,7 @@ export default function Schedule() {
       if (error) throw error
 
       await fetchLeaveTypes()
-      setNewLeaveType({ name: '', label: '', is_active: true })
+      setNewLeaveType({ label: '', is_active: true })
       setShowAddLeaveType(false)
     } catch (error) {
       console.error('Error adding leave type:', error)
@@ -536,7 +543,7 @@ export default function Schedule() {
                                 </span>
                                 {shift.swapped_with_user_id && (
                                   <div className="text-xs text-gray-500 mt-1 truncate" title={`Swapped with ${swappedUserNames[shift.swapped_with_user_id] || 'Unknown'}`}>
-                                    ÃÂ¢ÃÂÃÂ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
+                                    ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
                                   </div>
                                 )}
                               </div>
@@ -626,13 +633,7 @@ export default function Schedule() {
                 <li key={lt.id} className="px-4 py-4 sm:px-6">
                   {editingLeaveType?.id === lt.id ? (
                     <div className="flex items-center gap-4">
-                      <input
-                        type="text"
-                        value={editingLeaveType.name}
-                        onChange={e => setEditingLeaveType({ ...editingLeaveType, name: e.target.value })}
-                        className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
-                        placeholder="Name (e.g., sick)"
-                      />
+                      
                       <input
                         type="text"
                         value={editingLeaveType.label}
@@ -666,7 +667,7 @@ export default function Schedule() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{lt.label}</p>
-                        <p className="text-sm text-gray-500">Key: {lt.name}</p>
+                        
                       </div>
                       <div className="flex items-center gap-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -704,13 +705,7 @@ export default function Schedule() {
             <div className="px-4 py-4 sm:px-6 border-t bg-gray-50">
               <h4 className="text-sm font-medium text-gray-900 mb-3">Add New Leave Type</h4>
               <div className="flex items-center gap-4">
-                <input
-                  type="text"
-                  value={newLeaveType.name}
-                  onChange={e => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
-                  className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
-                  placeholder="Name (e.g., maternity)"
-                />
+                
                 <input
                   type="text"
                   value={newLeaveType.label}
@@ -736,7 +731,7 @@ export default function Schedule() {
                 <button
                   onClick={() => {
                     setShowAddLeaveType(false)
-                    setNewLeaveType({ name: '', label: '', is_active: true })
+                    setNewLeaveType({ label: '', is_active: true })
                   }}
                   className="text-gray-600 hover:text-gray-900 text-sm font-medium"
                 >
@@ -793,19 +788,19 @@ export default function Schedule() {
                     <button
                       key={leaveType.id}
                       onClick={() => {
-                        setSelectedLeaveType(leaveType.name as LeaveType)
+                        setSelectedLeaveType(leaveType.label)
                         setSelectedShiftType(null as any)
                       }}
                       className={`p-3 rounded-lg border-2 transition-colors ${
-                        selectedLeaveType === leaveType.name
+                        selectedLeaveType === leaveType.label
                           ? 'border-primary-500 bg-primary-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                        leaveColors[leaveType.name as LeaveType] || 'bg-gray-100 text-gray-800'
+                        leaveColors[labelToLeaveTypeEnum[leaveType.label] as LeaveType] || 'bg-gray-100 text-gray-800'
                       }`}>
-                        {leaveLabels[leaveType.name as LeaveType] || leaveType.label}
+                        {leaveType.label}
                       </span>
                     </button>
                   ))
