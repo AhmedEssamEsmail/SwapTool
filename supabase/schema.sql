@@ -53,10 +53,8 @@ CREATE TABLE swap_requests (
     requester_shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
     target_shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
     status swap_request_status NOT NULL DEFAULT 'pending_acceptance',
-    tl_approved_at TIMESTAMPTZ,
-    wfm_approved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT different_users CHECK (requester_id != target_user_id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Leave requests table
@@ -66,11 +64,10 @@ CREATE TABLE leave_requests (
     leave_type leave_type NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
+    reason TEXT,
     status leave_request_status NOT NULL DEFAULT 'pending_tl',
-    tl_approved_at TIMESTAMPTZ,
-    wfm_approved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT valid_date_range CHECK (end_date >= start_date)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Leave balances table
@@ -78,12 +75,12 @@ CREATE TABLE leave_balances (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     leave_type leave_type NOT NULL,
-    balance DECIMAL(5,2) NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(user_id, leave_type)
+    balance INTEGER NOT NULL DEFAULT 0,
+    year INTEGER NOT NULL DEFAULT EXTRACT(YEAR FROM CURRENT_DATE),
+    UNIQUE(user_id, leave_type, year)
 );
 
--- Comments table
+-- Comments/Notes table for requests
 CREATE TABLE comments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     request_type request_type NOT NULL,
@@ -93,11 +90,11 @@ CREATE TABLE comments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Settings table
+-- Settings table for WFM configuration
 CREATE TABLE settings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     key TEXT NOT NULL UNIQUE,
-    value TEXT NOT NULL,
+    value JSONB NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -105,8 +102,7 @@ CREATE TABLE settings (
 -- INDEXES
 -- ============================================
 
-CREATE INDEX idx_shifts_user_id ON shifts(user_id);
-CREATE INDEX idx_shifts_date ON shifts(date);
+CREATE INDEX idx_shifts_user_date ON shifts(user_id, date);
 CREATE INDEX idx_swap_requests_requester ON swap_requests(requester_id);
 CREATE INDEX idx_swap_requests_target ON swap_requests(target_user_id);
 CREATE INDEX idx_swap_requests_status ON swap_requests(status);
@@ -135,6 +131,35 @@ RETURNS user_role AS $$
 $$ LANGUAGE SQL SECURITY DEFINER;
 
 -- ============================================
+-- AUTO-CREATE USER PROFILE ON SIGNUP (Bug Fix)
+-- ============================================
+-- This trigger automatically creates a user profile in public.users
+-- when a new user signs up in auth.users. Uses SECURITY DEFINER to
+-- bypass RLS policies during the insert.
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (id, email, name, role)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+        'agent'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop existing trigger if exists (for idempotency)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Create trigger to auto-create user profile on signup
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================
 -- USERS POLICIES
 -- ============================================
 
@@ -151,17 +176,13 @@ CREATE POLICY "Users can update own profile"
     USING (auth.uid() = id)
     WITH CHECK (auth.uid() = id);
 
--- Users can insert their own profile during signup
-CREATE POLICY "Users can insert own profile"
-    ON users FOR INSERT
-    TO authenticated
-    WITH CHECK (auth.uid() = id);
-
 -- WFM can update any user (for role changes)
 CREATE POLICY "WFM can update any user"
     ON users FOR UPDATE
     TO authenticated
     USING (get_user_role(auth.uid()) = 'wfm');
+
+-- Note: INSERT policy removed - user creation is handled by trigger
 
 -- ============================================
 -- SHIFTS POLICIES
@@ -200,9 +221,9 @@ CREATE POLICY "Users can view own swap requests"
     ON swap_requests FOR SELECT
     TO authenticated
     USING (
-        auth.uid() = requester_id 
-        OR auth.uid() = target_user_id
-        OR get_user_role(auth.uid()) IN ('tl', 'wfm')
+        auth.uid() = requester_id OR 
+        auth.uid() = target_user_id OR
+        get_user_role(auth.uid()) IN ('tl', 'wfm')
     );
 
 -- Users can create swap requests
@@ -211,53 +232,33 @@ CREATE POLICY "Users can create swap requests"
     TO authenticated
     WITH CHECK (auth.uid() = requester_id);
 
--- Target user can accept/reject (update status from pending_acceptance)
-CREATE POLICY "Target can accept swap request"
+-- Users can update swap requests they're involved in (for acceptance)
+CREATE POLICY "Users can update swap requests"
     ON swap_requests FOR UPDATE
     TO authenticated
     USING (
-        auth.uid() = target_user_id 
-        AND status = 'pending_acceptance'
-    );
-
--- TL can approve (update status from pending_tl)
-CREATE POLICY "TL can approve swap request"
-    ON swap_requests FOR UPDATE
-    TO authenticated
-    USING (
+        auth.uid() = requester_id OR 
+        auth.uid() = target_user_id OR
         get_user_role(auth.uid()) IN ('tl', 'wfm')
-        AND status = 'pending_tl'
     );
 
--- WFM can approve (update status from pending_wfm)
-CREATE POLICY "WFM can approve swap request"
-    ON swap_requests FOR UPDATE
+-- TL/WFM can view all swap requests
+CREATE POLICY "TL and WFM can view all swap requests"
+    ON swap_requests FOR SELECT
     TO authenticated
-    USING (
-        get_user_role(auth.uid()) = 'wfm'
-        AND status = 'pending_wfm'
-    );
-
--- Requester can cancel their own request
-CREATE POLICY "Requester can cancel swap request"
-    ON swap_requests FOR DELETE
-    TO authenticated
-    USING (
-        auth.uid() = requester_id 
-        AND status = 'pending_acceptance'
-    );
+    USING (get_user_role(auth.uid()) IN ('tl', 'wfm'));
 
 -- ============================================
 -- LEAVE REQUESTS POLICIES
 -- ============================================
 
--- Users can view their own leave requests, TL/WFM can view all
+-- Users can view their own leave requests
 CREATE POLICY "Users can view own leave requests"
     ON leave_requests FOR SELECT
     TO authenticated
     USING (
-        auth.uid() = user_id 
-        OR get_user_role(auth.uid()) IN ('tl', 'wfm')
+        auth.uid() = user_id OR
+        get_user_role(auth.uid()) IN ('tl', 'wfm')
     );
 
 -- Users can create leave requests
@@ -266,47 +267,26 @@ CREATE POLICY "Users can create leave requests"
     TO authenticated
     WITH CHECK (auth.uid() = user_id);
 
--- TL can approve leave requests (pending_tl status)
-CREATE POLICY "TL can approve leave requests"
+-- TL/WFM can update leave requests
+CREATE POLICY "TL and WFM can update leave requests"
     ON leave_requests FOR UPDATE
     TO authenticated
-    USING (
-        get_user_role(auth.uid()) IN ('tl', 'wfm')
-        AND status = 'pending_tl'
-    );
-
--- WFM can approve leave requests (pending_wfm status)
-CREATE POLICY "WFM can approve leave requests"
-    ON leave_requests FOR UPDATE
-    TO authenticated
-    USING (
-        get_user_role(auth.uid()) = 'wfm'
-        AND status = 'pending_wfm'
-    );
-
--- Users can cancel their pending leave requests
-CREATE POLICY "Users can cancel pending leave requests"
-    ON leave_requests FOR DELETE
-    TO authenticated
-    USING (
-        auth.uid() = user_id 
-        AND status = 'pending_tl'
-    );
+    USING (get_user_role(auth.uid()) IN ('tl', 'wfm'));
 
 -- ============================================
 -- LEAVE BALANCES POLICIES
 -- ============================================
 
--- Users can view their own balances, TL/WFM can view all
+-- Users can view their own balances
 CREATE POLICY "Users can view own leave balances"
     ON leave_balances FOR SELECT
     TO authenticated
     USING (
-        auth.uid() = user_id 
-        OR get_user_role(auth.uid()) IN ('tl', 'wfm')
+        auth.uid() = user_id OR
+        get_user_role(auth.uid()) IN ('tl', 'wfm')
     );
 
--- Only WFM can manage leave balances
+-- WFM can manage all balances
 CREATE POLICY "WFM can manage leave balances"
     ON leave_balances FOR ALL
     TO authenticated
@@ -316,30 +296,24 @@ CREATE POLICY "WFM can manage leave balances"
 -- COMMENTS POLICIES
 -- ============================================
 
--- Users can view comments on requests they can view
-CREATE POLICY "Users can view related comments"
+-- Users can view comments on their requests
+CREATE POLICY "Users can view comments"
     ON comments FOR SELECT
     TO authenticated
     USING (true);
 
--- Users can add comments
-CREATE POLICY "Users can add comments"
+-- Users can create comments
+CREATE POLICY "Users can create comments"
     ON comments FOR INSERT
     TO authenticated
     WITH CHECK (auth.uid() = user_id);
-
--- Users can delete their own comments
-CREATE POLICY "Users can delete own comments"
-    ON comments FOR DELETE
-    TO authenticated
-    USING (auth.uid() = user_id);
 
 -- ============================================
 -- SETTINGS POLICIES
 -- ============================================
 
--- Everyone can read settings
-CREATE POLICY "Everyone can read settings"
+-- Everyone can view settings
+CREATE POLICY "Users can view settings"
     ON settings FOR SELECT
     TO authenticated
     USING (true);
@@ -356,90 +330,7 @@ CREATE POLICY "WFM can manage settings"
 
 -- Insert default settings
 INSERT INTO settings (key, value) VALUES
-    ('wfm_auto_approve', 'false')
+    ('max_swaps_per_month', '4'::jsonb),
+    ('advance_notice_days', '3'::jsonb),
+    ('approval_workflow', '"tl_then_wfm"'::jsonb)
 ON CONFLICT (key) DO NOTHING;
-
--- ============================================
--- FUNCTIONS FOR BUSINESS LOGIC
--- ============================================
-
--- Function to initialize leave balances for a new user
-CREATE OR REPLACE FUNCTION initialize_leave_balances()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO leave_balances (user_id, leave_type, balance)
-    VALUES
-        (NEW.id, 'annual', 21),
-        (NEW.id, 'sick', 15),
-        (NEW.id, 'casual', 6),
-        (NEW.id, 'public_holiday', 0),
-        (NEW.id, 'bereavement', 3);
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger to create leave balances when user is created
-CREATE TRIGGER on_user_created
-    AFTER INSERT ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION initialize_leave_balances();
-
--- Function to update leave balance when leave is approved
-CREATE OR REPLACE FUNCTION deduct_leave_balance()
-RETURNS TRIGGER AS $$
-DECLARE
-    days_requested INTEGER;
-BEGIN
-    -- Only run when status changes to approved
-    IF NEW.status = 'approved' AND OLD.status != 'approved' THEN
-        days_requested := NEW.end_date - NEW.start_date + 1;
-        
-        UPDATE leave_balances
-        SET balance = balance - days_requested,
-            updated_at = NOW()
-        WHERE user_id = NEW.user_id
-        AND leave_type = NEW.leave_type;
-    END IF;
-    
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger to deduct leave balance on approval
-CREATE TRIGGER on_leave_approved
-    AFTER UPDATE ON leave_requests
-    FOR EACH ROW
-    EXECUTE FUNCTION deduct_leave_balance();
-
--- Function to execute shift swap when approved
-CREATE OR REPLACE FUNCTION execute_shift_swap()
-RETURNS TRIGGER AS $$
-DECLARE
-    requester_shift_type shift_type;
-    target_shift_type shift_type;
-    requester_date DATE;
-    target_date DATE;
-BEGIN
-    -- Only run when status changes to approved
-    IF NEW.status = 'approved' AND OLD.status != 'approved' THEN
-        -- Get shift details
-        SELECT shift_type, date INTO requester_shift_type, requester_date
-        FROM shifts WHERE id = NEW.requester_shift_id;
-        
-        SELECT shift_type, date INTO target_shift_type, target_date
-        FROM shifts WHERE id = NEW.target_shift_id;
-        
-        -- Swap the shift types
-        UPDATE shifts SET shift_type = target_shift_type WHERE id = NEW.requester_shift_id;
-        UPDATE shifts SET shift_type = requester_shift_type WHERE id = NEW.target_shift_id;
-    END IF;
-    
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger to execute swap on approval
-CREATE TRIGGER on_swap_approved
-    AFTER UPDATE ON swap_requests
-    FOR EACH ROW
-    EXECUTE FUNCTION execute_shift_swap();
