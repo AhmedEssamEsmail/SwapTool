@@ -57,12 +57,12 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {/* Mobile sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-white transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:hidden`}>
+      <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:hidden`}>
         <div className="flex items-center justify-between h-16 px-4 border-b">
-          <span className="text-xl font-bold text-primary-600">SwapTool</span>
+          <span className="text-xl font-bold text-indigo-600">SwapTool</span>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
+            className="text-gray-500 hover:text-gray-700"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -70,15 +70,15 @@ export default function Layout({ children }: LayoutProps) {
           </button>
         </div>
         <nav className="px-4 py-4 space-y-1">
-          {filteredNavItems.map(item => (
+          {filteredNavItems.map((item) => (
             <Link
               key={item.href}
               to={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`block px-4 py-2 rounded-lg transition-colors ${
-                location.pathname === item.href || location.pathname.startsWith(item.href + '/')
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+              className={`block px-3 py-2 rounded-md text-sm font-medium ${
+                location.pathname === item.href
+                  ? 'bg-indigo-50 text-indigo-600'
+                  : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
               {item.name}
@@ -89,19 +89,19 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-1 bg-white border-r">
-          <div className="flex items-center h-16 px-6 border-b">
-            <span className="text-xl font-bold text-primary-600">SwapTool</span>
+        <div className="flex flex-col flex-1 bg-white border-r border-gray-200">
+          <div className="flex items-center h-16 px-4 border-b">
+            <span className="text-xl font-bold text-indigo-600">SwapTool</span>
           </div>
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-            {filteredNavItems.map(item => (
+            {filteredNavItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
-                className={`block px-4 py-2 rounded-lg transition-colors ${
-                  location.pathname === item.href || location.pathname.startsWith(item.href + '/')
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-100'
+                className={`block px-3 py-2 rounded-md text-sm font-medium ${
+                  location.pathname === item.href
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 {item.name}
@@ -113,37 +113,42 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        {/* Top header */}
-        <header className="sticky top-0 z-10 bg-white border-b">
-          <div className="flex items-center justify-between h-16 px-4 lg:px-8">
+        {/* Top header bar */}
+        <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between h-16 px-4">
+            {/* Mobile menu button */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-md text-gray-500 hover:bg-gray-100 lg:hidden"
+              className="text-gray-500 hover:text-gray-700 lg:hidden"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
 
+            {/* Spacer for desktop */}
+            <div className="hidden lg:block" />
+
+            {/* User info and sign out - top right */}
             <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${roleColors[user.role]}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${roleColors[user.role]}`}>
                   {roleLabels[user.role]}
                 </span>
               </div>
               <button
                 onClick={signOut}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
               >
-                Sign out
+                Sign Out
               </button>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-8">
+        <main className="p-6">
           {children}
         </main>
       </div>
