@@ -34,6 +34,22 @@ const leaveLabels: Record<LeaveType, string> = {
   bereavement: 'Bereav.',
 }
 
+
+// Mapping from display labels to database enum values
+const labelToLeaveTypeEnum: Record<string, LeaveType> = {
+  'Sick': 'sick',
+  'Annual': 'annual',
+  'Casual': 'casual',
+  'Holiday': 'public_holiday',
+  'Bereavement': 'bereavement',
+  // Also map the lowercase versions (for cases where name is already correct)
+  'sick': 'sick',
+  'annual': 'annual',
+  'casual': 'casual',
+  'public_holiday': 'public_holiday',
+  'bereavement': 'bereavement',
+}
+
 const defaultLeaveTypes: { name: string; label: string }[] = [
   { name: 'sick', label: 'Sick Leave' },
   { name: 'annual', label: 'Annual Leave' },
@@ -250,7 +266,7 @@ export default function Schedule() {
           .from('leave_requests')
           .insert({
             user_id: editingShift.userId,
-            leave_type: selectedLeaveType,
+            leave_type: labelToLeaveTypeEnum[selectedLeaveType] || selectedLeaveType,
             start_date: editingShift.date,
             end_date: editingShift.date,
             reason: 'Assigned by TL/WFM from schedule',
@@ -522,7 +538,7 @@ export default function Schedule() {
                                 </span>
                                 {shift.swapped_with_user_id && (
                                   <div className="text-xs text-gray-500 mt-1 truncate" title={`Swapped with ${swappedUserNames[shift.swapped_with_user_id] || 'Unknown'}`}>
-                                    Ã¢ÂÂ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
+                                    ÃÂ¢ÃÂÃÂ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
                                   </div>
                                 )}
                               </div>
