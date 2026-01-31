@@ -59,6 +59,7 @@ export interface Comment {
   content: string
   created_at: string
   user?: User
+  is_system?: boolean
 }
 
 export interface Setting {
