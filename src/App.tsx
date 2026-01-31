@@ -12,6 +12,9 @@ import CreateSwapRequest from './pages/CreateSwapRequest'
 import LeaveRequestDetail from './pages/LeaveRequestDetail'
 import SwapRequestDetail from './pages/SwapRequestDetail'
 import Settings from './pages/Settings'
+import Schedule from './pages/Schedule'
+import ScheduleUpload from './pages/ScheduleUpload'
+import LeaveBalances from './pages/LeaveBalances'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -49,6 +52,28 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function WFMOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  
+  if (user.role !== 'wfm') {
+    return <Navigate to="/dashboard" replace />
+  }
+  
+  return <Layout>{children}</Layout>
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -65,6 +90,11 @@ function App() {
             </PublicRoute>
           } />
           <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/shifts" element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
@@ -99,9 +129,29 @@ function App() {
               <SwapRequestDetail />
             </ProtectedRoute>
           } />
-          <Route path="/settings" element={
+          <Route path="/approvals" element={
             <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <WFMOnlyRoute>
               <Settings />
+            </WFMOnlyRoute>
+          } />
+          <Route path="/schedule" element={
+            <ProtectedRoute>
+              <Schedule />
+            </ProtectedRoute>
+          } />
+          <Route path="/schedule/upload" element={
+            <WFMOnlyRoute>
+              <ScheduleUpload />
+            </WFMOnlyRoute>
+          } />
+          <Route path="/leave-balances" element={
+            <ProtectedRoute>
+              <LeaveBalances />
             </ProtectedRoute>
           } />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
