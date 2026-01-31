@@ -102,7 +102,11 @@ export default function Schedule() {
 
   useEffect(() => {
     fetchScheduleData()
-  }, [currentDate, user])
+    // Fetch leave types when schedule loads (needed for edit modal)
+    if (canEdit) {
+      fetchLeaveTypes()
+    }
+  }, [currentDate, user, canEdit])
 
   useEffect(() => {
     if (activeTab === 'leave-types' && canEdit) {
@@ -241,7 +245,14 @@ export default function Schedule() {
     setEditingShift({ userId, date: dateStr, shiftId: existingShift?.id, existingLeave })
     setSelectedShiftType(existingShift?.shift_type || 'AM')
     // If there's an existing leave, pre-select that leave type; otherwise null (shift mode)
-    setSelectedLeaveType(existingLeave ? existingLeave.leave_type : null)
+    // Find the label for the leave type enum value
+    if (existingLeave) {
+      // Get the display label from leave_type enum
+      const leaveLabel = leaveLabels[existingLeave.leave_type as LeaveType] || existingLeave.leave_type
+      setSelectedLeaveType(leaveLabel)
+    } else {
+      setSelectedLeaveType(null)
+    }
   }
 
   async function saveShift() {
@@ -254,7 +265,9 @@ export default function Schedule() {
         // First, remove any existing leave for this day if different
         if (editingShift.existingLeave) {
           // Check if it's the same leave type - if so, just close modal
-          if (editingShift.existingLeave.leave_type === selectedLeaveType) {
+          // Normalize to enum for comparison
+          const selectedLeaveEnum = labelToLeaveTypeEnum[selectedLeaveType] || selectedLeaveType
+          if (editingShift.existingLeave.leave_type === selectedLeaveEnum) {
             setEditingShift(null)
             setSavingShift(false)
             return
@@ -544,7 +557,7 @@ export default function Schedule() {
                                 </span>
                                 {shift.swapped_with_user_id && (
                                   <div className="text-xs text-gray-500 mt-1 truncate" title={`Swapped with ${swappedUserNames[shift.swapped_with_user_id] || 'Unknown'}`}>
-                                    ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
+                                    ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
                                   </div>
                                 )}
                               </div>
@@ -807,7 +820,7 @@ export default function Schedule() {
                         setSelectedShiftType(null as any)
                       }}
                       className={`p-3 rounded-lg border-2 transition-colors ${
-                        selectedLeaveType === leaveType.label
+                        (labelToLeaveTypeEnum[selectedLeaveType] || selectedLeaveType) === (labelToLeaveTypeEnum[leaveType.label] || leaveType.label)
                           ? 'border-primary-500 bg-primary-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
