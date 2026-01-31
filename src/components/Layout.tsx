@@ -32,7 +32,6 @@ const navItems: NavItem[] = [
   { name: 'Swap Requests', href: '/swap-requests', roles: ['agent', 'tl', 'wfm'] },
   { name: 'Leave Requests', href: '/leave-requests', roles: ['agent', 'tl', 'wfm'] },
   { name: 'Leave Balances', href: '/leave-balances', roles: ['agent', 'tl', 'wfm'] },
-  { name: 'Team Approvals', href: '/approvals', roles: ['tl', 'wfm'] },
   { name: 'Schedule Upload', href: '/schedule/upload', roles: ['wfm'] },
   { name: 'Settings', href: '/settings', roles: ['wfm'] },
 ]
