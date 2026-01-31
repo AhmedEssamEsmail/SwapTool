@@ -71,7 +71,6 @@ export interface Setting {
 
 export interface LeaveTypeConfig {
   id: string
-  name: string
   label: string
   is_active: boolean
   created_at: string
