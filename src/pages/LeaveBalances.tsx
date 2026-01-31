@@ -3,13 +3,6 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { User, LeaveType } from '../types'
 
-interface LeaveBalance {
-  id: string
-  user_id: string
-  leave_type: LeaveType
-  balance: number
-  updated_at: string
-}
 
 interface UserWithBalances extends User {
   balances: Record<LeaveType, number>
