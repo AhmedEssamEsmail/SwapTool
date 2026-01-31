@@ -463,9 +463,9 @@ export default function SwapRequestDetail() {
                 step.status === 'skipped' ? 'bg-gray-300 text-gray-500' :
                 'bg-gray-200 text-gray-500'
               }`}>
-                {step.status === 'completed' ? 'Ã¢ÂÂ' :
-                 step.status === 'rejected' ? 'Ã¢ÂÂ' :
-                 step.status === 'skipped' ? 'Ã¢ÂÂ' :
+                {step.status === 'completed' ? '✓' :
+                 step.status === 'rejected' ? '✗' :
+                 step.status === 'skipped' ? '−' :
                  step.status === 'pending' ? '...' :
                  index + 1}
               </div>
