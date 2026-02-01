@@ -292,14 +292,21 @@ export default function ScheduleUpload() {
           
           // Check for leave first (leaves take priority)
           const leave = (leaves || []).find(l => {
+            if (l.user_id !== user.id) return false
             const leaveStart = new Date(l.start_date)
             const leaveEnd = new Date(l.end_date)
-            return l.user_id === user.id && date >= leaveStart && date <= leaveEnd
+            // Reset time to midnight for proper date comparison
+            leaveStart.setHours(0, 0, 0, 0)
+            leaveEnd.setHours(23, 59, 59, 999)
+            const currentDate = new Date(date)
+            currentDate.setHours(12, 0, 0, 0) // Set to noon to avoid timezone issues
+            return currentDate >= leaveStart && currentDate <= leaveEnd
           })
           
           if (leave) {
             // Add leave type as uppercase label
-            row.push(leaveTypeShortLabels[leave.leave_type as LeaveType] || leave.leave_type.toUpperCase())
+            const leaveTypeLabel = leaveTypeShortLabels[leave.leave_type as LeaveType]
+            row.push(leaveTypeLabel || leave.leave_type.toUpperCase())
           } else {
             // Check for shift
             const shift = (shifts || []).find(s => s.user_id === user.id && s.date === dateStr)
