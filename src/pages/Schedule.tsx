@@ -94,11 +94,17 @@ export default function Schedule() {
   const [editingLeaveType, setEditingLeaveType] = useState<LeaveTypeConfig | null>(null)
   const [newLeaveType, setNewLeaveType] = useState({ label: '', color: 'gray', is_active: true })
   const [showAddLeaveType, setShowAddLeaveType] = useState(false)
+  
+  // Filter state
+  const [selectedUserId, setSelectedUserId] = useState<string>('all')
 
   const canEdit = user?.role === 'tl' || user?.role === 'wfm'
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  
+  // Filter users based on selection
+  const filteredUsers = selectedUserId === 'all' ? users : users.filter(u => u.id === selectedUserId)
 
   useEffect(() => {
     fetchScheduleData()
@@ -489,6 +495,24 @@ export default function Schedule() {
             {canEdit ? 'View and manage team schedules' : 'View your schedule'}
           </p>
         </div>
+        
+        {/* Agent Filter - Only show for TL/WFM */}
+        {canEdit && (
+          <div className="mt-4 sm:mt-0">
+            <label htmlFor="agent-filter" className="sr-only">Filter by agent</label>
+            <select
+              id="agent-filter"
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="block w-full sm:w-64 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
+            >
+              <option value="all">All Agents</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Tabs for TL/WFM */}
@@ -565,7 +589,7 @@ export default function Schedule() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {users.map(u => (
+                  {filteredUsers.map(u => (
                     <tr key={u.id}>
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
                         {u.name}
