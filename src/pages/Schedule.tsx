@@ -260,57 +260,84 @@ export default function Schedule() {
     setSavingShift(true)
 
     try {
-      // If a leave type is selected, we're assigning/updating leave
-      if (selectedLeaveType) {
-        // First, remove any existing leave for this day if different
+      // CASE 1: Delete only - no shift or leave selected
+      if (!selectedLeaveType && !selectedShiftType) {
+        // Delete existing leave if any
         if (editingShift.existingLeave) {
-          // Check if it's the same leave type - if so, just close modal
-          // Normalize to enum for comparison
-          const selectedLeaveEnum = labelToLeaveTypeEnum[selectedLeaveType] || selectedLeaveType
-          if (editingShift.existingLeave.leave_type === selectedLeaveEnum) {
-            setEditingShift(null)
-            setSavingShift(false)
-            return
-          }
-          // Delete the existing leave entry for this specific date
-          const { error: deleteError } = await supabase
+          const { error } = await supabase
             .from('leave_requests')
             .delete()
             .eq('id', editingShift.existingLeave.id)
-          
-          if (deleteError) throw deleteError
+          if (error) throw error
         }
 
-        // Create new approved leave request for this single day
-        const { error: leaveError } = await supabase
-          .from('leave_requests')
-          .insert({
-            user_id: editingShift.userId,
-            leave_type: labelToLeaveTypeEnum[selectedLeaveType] || selectedLeaveType,
-            start_date: editingShift.date,
-            end_date: editingShift.date,
-            notes: 'Assigned by TL/WFM from schedule',
-            status: 'approved'
-          })
+        // Delete existing shift if any
+        if (editingShift.shiftId) {
+          const { error } = await supabase
+            .from('shifts')
+            .delete()
+            .eq('id', editingShift.shiftId)
+          if (error) throw error
+        }
 
-        if (leaveError) throw leaveError
+        await fetchScheduleData()
+        setEditingShift(null)
+        setSavingShift(false)
+        return
+      }
 
-        // Optionally remove any existing shift for this day (leave takes precedence visually)
+      // CASE 2: Assign/update leave
+      if (selectedLeaveType) {
+        const selectedLeaveEnum = labelToLeaveTypeEnum[selectedLeaveType] || selectedLeaveType
+
+        // If there's an existing leave with the same type, just close
+        if (editingShift.existingLeave && editingShift.existingLeave.leave_type === selectedLeaveEnum) {
+          setEditingShift(null)
+          setSavingShift(false)
+          return
+        }
+
+        // If there's an existing leave with different type, UPDATE it instead of delete+insert
+        if (editingShift.existingLeave) {
+          const { error: updateError } = await supabase
+            .from('leave_requests')
+            .update({ leave_type: selectedLeaveEnum })
+            .eq('id', editingShift.existingLeave.id)
+
+          if (updateError) throw updateError
+        } else {
+          // No existing leave - create new one
+          const { error: leaveError } = await supabase
+            .from('leave_requests')
+            .insert({
+              user_id: editingShift.userId,
+              leave_type: selectedLeaveEnum,
+              start_date: editingShift.date,
+              end_date: editingShift.date,
+              notes: 'Assigned by TL/WFM from schedule',
+              status: 'approved'
+            })
+
+          if (leaveError) throw leaveError
+        }
+
+        // Remove any existing shift for this day (leave takes precedence)
         if (editingShift.shiftId) {
           await supabase
             .from('shifts')
             .delete()
             .eq('id', editingShift.shiftId)
         }
-      } else {
-        // No leave selected - save as shift
-        // First, remove any existing leave for this day if present
+      }
+      // CASE 3: Assign/update shift (no leave selected)
+      else if (selectedShiftType) {
+        // First, remove any existing leave for this day
         if (editingShift.existingLeave) {
           const { error: deleteLeaveError } = await supabase
             .from('leave_requests')
             .delete()
             .eq('id', editingShift.existingLeave.id)
-          
+
           if (deleteLeaveError) throw deleteLeaveError
         }
 
@@ -347,22 +374,33 @@ export default function Schedule() {
   }
 
   async function deleteShift() {
-    if (!editingShift?.shiftId) return
+    if (!editingShift) return
     setSavingShift(true)
 
     try {
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('id', editingShift.shiftId)
+      // Delete existing leave if any
+      if (editingShift.existingLeave) {
+        const { error } = await supabase
+          .from('leave_requests')
+          .delete()
+          .eq('id', editingShift.existingLeave.id)
+        if (error) throw error
+      }
 
-      if (error) throw error
+      // Delete existing shift if any
+      if (editingShift.shiftId) {
+        const { error } = await supabase
+          .from('shifts')
+          .delete()
+          .eq('id', editingShift.shiftId)
+        if (error) throw error
+      }
 
       await fetchScheduleData()
       setEditingShift(null)
     } catch (error) {
-      console.error('Error deleting shift:', error)
-      alert('Failed to delete shift')
+      console.error('Error deleting:', error)
+      alert('Failed to delete')
     } finally {
       setSavingShift(false)
     }
@@ -557,7 +595,7 @@ export default function Schedule() {
                                 </span>
                                 {shift.swapped_with_user_id && (
                                   <div className="text-xs text-gray-500 mt-1 truncate" title={`Swapped with ${swappedUserNames[shift.swapped_with_user_id] || 'Unknown'}`}>
-                                    ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
+                                    ↔ {swappedUserNames[shift.swapped_with_user_id]?.split(' ')[0] || '?'}
                                   </div>
                                 )}
                               </div>
@@ -790,7 +828,7 @@ export default function Schedule() {
                     key={type}
                     onClick={() => { setSelectedShiftType(type); setSelectedLeaveType(null); }}
                     className={`p-3 rounded-lg border-2 transition-colors ${
-                      selectedShiftType === type
+                      selectedShiftType === type && !selectedLeaveType
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
@@ -849,7 +887,7 @@ export default function Schedule() {
 
             <div className="mt-6 flex justify-between">
               <div>
-                {editingShift.shiftId && (
+                {(editingShift.shiftId || editingShift.existingLeave) && (
                   <button
                     onClick={deleteShift}
                     disabled={savingShift}
