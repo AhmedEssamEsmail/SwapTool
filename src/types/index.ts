@@ -73,15 +73,13 @@ export interface LeaveBalance {
   id: string
   user_id: string
   leave_type: LeaveType
+  balance: number
   year: number
-  total_days: number
-  used_days: number
-  created_at: string
-  updated_at: string
 }
 
-export interface Setting {
-  key: string
-  value: string
-  updated_at: string
+export interface LeaveTypeConfig {
+  id: string
+  label: string
+  is_active: boolean
+  created_at: string
 }
