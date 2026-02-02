@@ -16,58 +16,36 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Helper function to convert Supabase errors to user-friendly messages
+// Helper: Convert Supabase errors to the specific user messages you requested
 function getUserFriendlyError(error: any): Error {
-  // Handle case where error might be a string or have different structure
-  const errorMessage = typeof error === 'string' ? error : (error?.message || error?.error_description || error?.msg || 'Unknown error')
+  const errorMessage = typeof error === 'string' 
+    ? error 
+    : (error?.message || error?.error_description || error?.msg || 'Unknown error')
+  
   const message = errorMessage.toLowerCase()
   
-  console.error('Auth error details:', error) // Log full error for debugging
-  
-  // Check for specific Supabase error messages
-  if (message.includes('invalid login credentials') || message.includes('invalid email or password')) {
-    return new Error('Invalid email or password. Please check your credentials and try again.')
-  }
-  
+  // 1. Not Confirmed User
   if (message.includes('email not confirmed')) {
-    return new Error('Please verify your email address before signing in. Check your inbox for the confirmation link.')
-  }
-  
-  if (message.includes('user not found')) {
-    return new Error('No account found with this email address. Please sign up first.')
-  }
-  
-  if (message.includes('invalid email')) {
-    return new Error('Please enter a valid email address.')
-  }
-  
-  if (message.includes('password is too short') || message.includes('password should be at least')) {
-    return new Error('Password must be at least 6 characters long.')
-  }
-  
-  if (message.includes('user already registered')) {
-    return new Error('An account with this email already exists. Please sign in instead.')
-  }
-  
-  if (message.includes('only @dabdoob.com') || message.includes('dabdoob.com email addresses are allowed')) {
-    return new Error('Only @dabdoob.com email addresses are allowed.')
-  }
-  
-  if (message.includes('network') || message.includes('fetch')) {
-    return new Error('Network error. Please check your internet connection and try again.')
-  }
-  
-  if (message.includes('rate limit')) {
-    return new Error('Too many attempts. Please wait a moment and try again.')
+    return new Error('Please verify your email address. Check your inbox for the confirmation link.')
   }
 
-  if (message.includes('invalid grant')) {
-    return new Error('Invalid email or password. Please check your credentials and try again.')
+  // 2. Wrong Password or Invalid Credentials
+  // Supabase returns 'Invalid login credentials' for both wrong password and wrong email (security best practice)
+  if (message.includes('invalid login credentials') || message.includes('invalid email or password') || message.includes('invalid grant')) {
+    return new Error('Invalid email or password. Please check your credentials.')
   }
-  
-  // If no specific error matched, return a generic message but log the original for debugging
-  console.error('Unhandled auth error:', error)
-  return new Error('Unable to sign in. Please check your email and password and try again.')
+
+  // 3. User Not Found (Rarely returned directly by Supabase for security, but handled just in case)
+  if (message.includes('user not found')) {
+    return new Error('No account found with this email. Please sign up first.')
+  }
+
+  // 4. Other common errors
+  if (message.includes('invalid email')) return new Error('Please enter a valid email address.')
+  if (message.includes('rate limit')) return new Error('Too many login attempts. Please wait a moment.')
+  if (message.includes('network') || message.includes('fetch')) return new Error('Network error. Check your connection.')
+
+  return new Error(errorMessage) // Fallback
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -76,7 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Computed property for authenticated state
   const isAuthenticated = !!session && !!user
 
   const fetchUserProfile = useCallback(async (userId: string) => {
@@ -90,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error
       setUser(data as User)
     } catch (error) {
-      console.error('Error fetching user profile:', error)
+      console.error('Error fetching profile:', error)
       setUser(null)
     } finally {
       setLoading(false)
@@ -98,24 +75,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setSupabaseUser(session?.user ?? null)
-      if (session?.user) {
-        fetchUserProfile(session.user.id)
-      } else {
-        setLoading(false)
-      }
+      if (session?.user) fetchUserProfile(session.user.id)
+      else setLoading(false)
     })
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setSupabaseUser(session?.user ?? null)
-      if (session?.user) {
-        fetchUserProfile(session.user.id)
-      } else {
+      if (session?.user) fetchUserProfile(session.user.id)
+      else {
         setUser(null)
         setLoading(false)
       }
@@ -126,15 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, name: string) {
     try {
-      // Sign up with user metadata - trigger will create profile automatically
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { name }
-        }
+        options: { data: { name } }
       })
-
       if (error) throw getUserFriendlyError(error)
       return { error: null }
     } catch (error) {
@@ -144,18 +111,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     try {
-      setLoading(true)
+      // Note: We avoid setting global loading(true) here to prevent UI flickers that might reset form state
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) {
-        console.error('Supabase signIn error:', error)
-        throw getUserFriendlyError(error)
-      }
+      if (error) throw getUserFriendlyError(error)
 
-      // Wait for session to be established and user profile to be fetched
       if (data.session?.user) {
         setSession(data.session)
         setSupabaseUser(data.session.user)
@@ -164,13 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { error: null, session: data.session }
     } catch (error: any) {
-      setLoading(false)
-      console.error('Sign in catch block:', error)
-      // If it's already a user-friendly error, return it. Otherwise, process it
-      const finalError = error instanceof Error && error.message.includes('Invalid email') 
-        ? error 
-        : getUserFriendlyError(error)
-      return { error: finalError, session: null }
+      return { error: error instanceof Error ? error : getUserFriendlyError(error), session: null }
     }
   }
 
@@ -182,16 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      supabaseUser, 
-      session, 
-      loading, 
-      isAuthenticated,
-      signUp, 
-      signIn, 
-      signOut 
-    }}>
+    <AuthContext.Provider value={{ user, supabaseUser, session, loading, isAuthenticated, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )
