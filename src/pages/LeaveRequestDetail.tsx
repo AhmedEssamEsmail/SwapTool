@@ -196,6 +196,55 @@ export default function LeaveRequestDetail() {
 
     try {
       const oldStatus = request.status
+      
+      // Calculate the number of leave days to restore
+      const startDate = new Date(request.start_date)
+      const endDate = new Date(request.end_date)
+      const leaveDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+      // Get the user's current balance for this leave type
+      const { data: balanceData, error: balanceError } = await supabase
+        .from('leave_balances')
+        .select('balance')
+        .eq('user_id', request.user_id)
+        .eq('leave_type', request.leave_type)
+        .single()
+
+      if (balanceError) throw balanceError
+
+      const currentBalance = Number(balanceData?.balance || 0)
+      const newBalance = currentBalance + leaveDays
+
+      // Restore the balance
+      const { error: updateBalanceError } = await supabase
+        .from('leave_balances')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', request.user_id)
+        .eq('leave_type', request.leave_type)
+
+      if (updateBalanceError) throw updateBalanceError
+
+      // Log the balance restoration in history
+      const { error: historyError } = await supabase
+        .from('leave_balance_history')
+        .insert({
+          user_id: request.user_id,
+          leave_type: request.leave_type,
+          previous_balance: currentBalance,
+          new_balance: newBalance,
+          change_reason: `Approval revoked for leave request (restored ${leaveDays} day(s))`,
+          changed_by: user.id
+        })
+
+      if (historyError) {
+        console.error('Failed to log balance history:', historyError)
+        // Don't throw - balance was restored, history logging is secondary
+      }
+
+      // Reset the leave request status
       const { error: updateError } = await supabase
         .from('leave_requests')
         .update({
@@ -209,7 +258,7 @@ export default function LeaveRequestDetail() {
 
       // Create system comment
       await createSystemComment(
-        `System: ${user.name} revoked decision. Status reset from ${statusLabels[oldStatus]} to Pending TL Approval`
+        `System: ${user.name} revoked decision. Status reset from ${statusLabels[oldStatus]} to Pending TL Approval. Restored ${leaveDays} ${request.leave_type} leave day(s) to balance.`
       )
 
       await fetchRequestDetails()
