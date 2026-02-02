@@ -173,7 +173,7 @@ export default function CreateSwapRequest() {
           requester_shift_id: myShiftId,
           target_user_id: targetUserId,
           target_shift_id: targetShiftId,
-          status: 'pending_target'
+          status: 'pending_acceptance'
         })
 
       if (insertError) throw insertError
