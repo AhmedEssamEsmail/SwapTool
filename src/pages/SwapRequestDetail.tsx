@@ -166,7 +166,7 @@ export default function SwapRequestDetail() {
 
       // Create system comment
       await createSystemComment(
-        `System: ${user.name} accepted the swap request. Status changed from ${statusLabels[oldStatus]} to Pending TL Approval`
+        `${user.name} accepted the swap request. Status changed from ${statusLabels[oldStatus]} to Pending TL Approval`
       )
 
       await fetchRequestDetails()
@@ -195,7 +195,7 @@ export default function SwapRequestDetail() {
 
       // Create system comment
       await createSystemComment(
-        `System: ${user.name} declined the swap request. Status changed from ${statusLabels[oldStatus]} to Rejected`
+        `${user.name} declined the swap request. Status changed from ${statusLabels[oldStatus]} to Rejected`
       )
 
       await fetchRequestDetails()
@@ -323,7 +323,7 @@ export default function SwapRequestDetail() {
 
       // Create system comment
       await createSystemComment(
-        `System: ${user.name} approved. Status changed from ${statusLabels[oldStatus]} to ${statusLabels[newStatus]}`
+        `${user.name} approved. Status changed from ${statusLabels[oldStatus]} to ${statusLabels[newStatus]}`
       )
 
       await fetchRequestDetails()
@@ -352,7 +352,7 @@ export default function SwapRequestDetail() {
 
       // Create system comment
       await createSystemComment(
-        `System: ${user.name} rejected. Status changed from ${statusLabels[oldStatus]} to Rejected`
+        `${user.name} rejected. Status changed from ${statusLabels[oldStatus]} to Rejected`
       )
 
       await fetchRequestDetails()
@@ -460,7 +460,7 @@ export default function SwapRequestDetail() {
 
       // Create system comment
       await createSystemComment(
-        `System: ${user.name} revoked decision. Status reset from ${statusLabels[oldStatus]} to Pending TL Approval. All 4 shifts restored to original values.`
+        `${user.name} revoked decision. Status reset from ${statusLabels[oldStatus]} to Pending TL Approval. All 4 shifts restored to original values.`
       )
 
       await fetchRequestDetails()
@@ -823,7 +823,7 @@ export default function SwapRequestDetail() {
               <div key={comment.id} className={`p-3 rounded-lg ${comment.is_system ? 'bg-gray-100' : 'bg-blue-50'}`}>
                 <div className="flex justify-between items-start mb-1">
                   <span className="text-sm font-medium text-blue-800">
-                    {comment.user?.name || 'Unknown User'}
+                    {comment.is_system ? 'System' : comment.user?.name || 'Unknown User'}
                   </span>
                   <span className="text-xs text-gray-500">
                     {format(new Date(comment.created_at), 'MMM d, yyyy h:mm a')}
