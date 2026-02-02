@@ -171,7 +171,7 @@ export default function CreateSwapRequest() {
         .insert({
           requester_id: effectiveRequesterId,
           requester_shift_id: myShiftId,
-          target_id: targetUserId,
+          target_user_id: targetUserId,
           target_shift_id: targetShiftId,
           status: 'pending_target'
         })
