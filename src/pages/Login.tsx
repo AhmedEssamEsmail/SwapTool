@@ -37,10 +37,15 @@ export default function Login() {
       return
     }
 
+    console.log('Attempting sign in with:', email) // Debug log
+
     const { error, session: _session } = await signIn(email, password)
     
+    console.log('Sign in result - error:', error, 'session:', _session) // Debug log
+    
     if (error) {
-      setError(error.message)
+      console.error('Login error:', error) // Debug log
+      setError(error.message || 'An unknown error occurred')
       setLoading(false)
     }
     // Don't set loading to false on success - let the useEffect handle redirect
