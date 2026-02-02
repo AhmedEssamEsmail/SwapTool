@@ -64,7 +64,7 @@ export default function SwapRequestDetail() {
       // Fetch swap request
       const { data: requestData, error: requestError } = await supabase
         .from('swap_requests')
-        .select('*, requester_original_date, requester_original_shift_type, target_original_date, target_original_shift_type')
+        .select('*, requester_original_date, requester_original_shift_type, target_original_date, target_original_shift_type, requester_original_shift_type_on_target_date, target_original_shift_type_on_requester_date')
         .eq('id', id)
         .single()
 
@@ -570,31 +570,55 @@ export default function SwapRequestDetail() {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Swap Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Requester's Shift */}
+          {/* Requester's Shifts */}
           <div className="border rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Requester's Shift</h3>
-            <p className="text-sm text-gray-500 mb-1">{requester.name}</p>
-            {requesterShift && (
-              <>
-                <p className="font-medium">{format(new Date(requesterShift.date), 'MMM d, yyyy')}</p>
+            <h3 className="font-medium text-gray-900 mb-2">Requester's Shifts</h3>
+            <p className="text-sm text-gray-500 mb-3">{requester.name}</p>
+            
+            {/* Date 1: requester_original_date */}
+            {request.requester_original_date && (
+              <div className="mb-3">
+                <p className="font-medium">{format(new Date(request.requester_original_date), 'MMM d, yyyy')}</p>
                 <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
-                  {shiftLabels[requesterShift.shift_type]}
+                  {request.requester_original_shift_type ? shiftLabels[request.requester_original_shift_type as ShiftType] : 'Unknown'}
                 </span>
-              </>
+              </div>
+            )}
+            
+            {/* Date 2: target_original_date */}
+            {request.target_original_date && (
+              <div>
+                <p className="font-medium">{format(new Date(request.target_original_date), 'MMM d, yyyy')}</p>
+                <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                  {request.requester_original_shift_type_on_target_date ? shiftLabels[request.requester_original_shift_type_on_target_date as ShiftType] : 'Unknown'}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* Target's Shift */}
+          {/* Target's Shifts */}
           <div className="border rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Target's Shift</h3>
-            <p className="text-sm text-gray-500 mb-1">{targetUser.name}</p>
-            {targetShift && (
-              <>
-                <p className="font-medium">{format(new Date(targetShift.date), 'MMM d, yyyy')}</p>
+            <h3 className="font-medium text-gray-900 mb-2">Target's Shifts</h3>
+            <p className="text-sm text-gray-500 mb-3">{targetUser.name}</p>
+            
+            {/* Date 1: requester_original_date */}
+            {request.requester_original_date && (
+              <div className="mb-3">
+                <p className="font-medium">{format(new Date(request.requester_original_date), 'MMM d, yyyy')}</p>
                 <span className="inline-block mt-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-sm">
-                  {shiftLabels[targetShift.shift_type]}
+                  {request.target_original_shift_type_on_requester_date ? shiftLabels[request.target_original_shift_type_on_requester_date as ShiftType] : 'Unknown'}
                 </span>
-              </>
+              </div>
+            )}
+            
+            {/* Date 2: target_original_date */}
+            {request.target_original_date && (
+              <div>
+                <p className="font-medium">{format(new Date(request.target_original_date), 'MMM d, yyyy')}</p>
+                <span className="inline-block mt-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-sm">
+                  {request.target_original_shift_type ? shiftLabels[request.target_original_shift_type as ShiftType] : 'Unknown'}
+                </span>
+              </div>
             )}
           </div>
         </div>
