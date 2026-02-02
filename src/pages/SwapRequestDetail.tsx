@@ -219,10 +219,30 @@ export default function SwapRequestDetail() {
       let updateData: Partial<SwapRequest> = {}
 
       if (user.role === 'tl' && request.status === 'pending_tl') {
-        newStatus = 'pending_wfm'
-        updateData = {
-          status: newStatus,
-          tl_approved_at: new Date().toISOString()
+        // Check if auto-approve is enabled
+        const { data: autoApproveSetting } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'wfm_auto_approve')
+          .maybeSingle()
+
+        const autoApproveEnabled = autoApproveSetting?.value === 'true'
+
+        if (autoApproveEnabled) {
+          // Auto-approve: skip WFM and go straight to approved
+          newStatus = 'approved'
+          updateData = {
+            status: newStatus,
+            tl_approved_at: new Date().toISOString(),
+            wfm_approved_at: new Date().toISOString() // Mark as auto-approved
+          }
+        } else {
+          // Normal flow: send to WFM for approval
+          newStatus = 'pending_wfm'
+          updateData = {
+            status: newStatus,
+            tl_approved_at: new Date().toISOString()
+          }
         }
       } else if (user.role === 'wfm' && (request.status === 'pending_wfm' || request.status === 'pending_tl')) {
         newStatus = 'approved'
@@ -321,10 +341,16 @@ export default function SwapRequestDetail() {
         }
       }
 
-      // Create system comment
-      await createSystemComment(
-        `${user.name} approved. Status changed from ${statusLabels[oldStatus]} to ${statusLabels[newStatus]}`
-      )
+      // Create system comment with appropriate message
+      if (user.role === 'tl' && newStatus === 'approved') {
+        await createSystemComment(
+          `${user.name} approved (auto-approved by system). Status changed from ${statusLabels[oldStatus]} to ${statusLabels[newStatus]}`
+        )
+      } else {
+        await createSystemComment(
+          `${user.name} approved. Status changed from ${statusLabels[oldStatus]} to ${statusLabels[newStatus]}`
+        )
+      }
 
       await fetchRequestDetails()
     } catch (error) {
