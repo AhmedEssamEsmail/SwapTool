@@ -36,6 +36,7 @@ interface ShiftWithUser extends Shift {
 
 interface CommentWithSystem extends Comment {
   is_system?: boolean
+  user?: User
 }
 
 export default function SwapRequestDetail() {
