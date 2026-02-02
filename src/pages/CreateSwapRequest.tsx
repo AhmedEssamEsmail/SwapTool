@@ -15,6 +15,7 @@ export default function CreateSwapRequest() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [agents, setAgents] = useState<User[]>([])
+  const [allUsers, setAllUsers] = useState<User[]>([])
   const [targetUserId, setTargetUserId] = useState('')
   const [myShifts, setMyShifts] = useState<Shift[]>([])
   const [targetShifts, setTargetShifts] = useState<Shift[]>([])
@@ -25,11 +26,31 @@ export default function CreateSwapRequest() {
   const [loadingShifts, setLoadingShifts] = useState(false)
   const [error, setError] = useState('')
 
+  // New state for "submit on behalf of" feature
+  const [requesterUserId, setRequesterUserId] = useState('')
+  const [loadingAllUsers, setLoadingAllUsers] = useState(false)
+
+  // Check if current user can submit on behalf of others (WFM or TL roles)
+  const canSubmitOnBehalf = user?.role === 'wfm' || user?.role === 'tl'
+
   // Fetch other agents on mount
   useEffect(() => {
-    fetchAgents()
-    fetchMyShifts()
-  }, [user])
+    if (canSubmitOnBehalf) {
+      fetchAllUsers()
+    }
+    // Set default requester to current user
+    if (user) {
+      setRequesterUserId(user.id)
+    }
+  }, [user, canSubmitOnBehalf])
+
+  // Fetch agents and requester's shifts when requester changes
+  useEffect(() => {
+    if (requesterUserId) {
+      fetchAgents()
+      fetchRequesterShifts()
+    }
+  }, [requesterUserId])
 
   // Fetch target user's shifts when target changes
   useEffect(() => {
@@ -41,18 +62,42 @@ export default function CreateSwapRequest() {
     }
   }, [targetUserId])
 
-  const fetchAgents = async () => {
-    setLoadingAgents(true)
+  const fetchAllUsers = async () => {
+    setLoadingAllUsers(true)
     try {
       const { data, error } = await supabase
         .from('users')
         .select('*')
+        .order('name')
+
+      if (error) throw error
+      setAllUsers(data || [])
+    } catch (err) {
+      console.error('Error fetching all users:', err)
+    } finally {
+      setLoadingAllUsers(false)
+    }
+  }
+
+  const fetchAgents = async () => {
+    setLoadingAgents(true)
+    try {
+      // Get the effective requester ID (selected user for WFM/TL, or current user)
+      const effectiveRequesterId = canSubmitOnBehalf ? requesterUserId : user!.id
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
         .eq('role', 'agent')
-        .neq('id', user!.id)
+        .neq('id', effectiveRequesterId)
         .order('name')
 
       if (error) throw error
       setAgents(data || [])
+      // Reset target selection when requester changes
+      setTargetUserId('')
+      setTargetShifts([])
+      setTargetShiftId('')
     } catch (err) {
       console.error('Error fetching agents:', err)
     } finally {
@@ -60,20 +105,23 @@ export default function CreateSwapRequest() {
     }
   }
 
-  const fetchMyShifts = async () => {
+  const fetchRequesterShifts = async () => {
     try {
+      const effectiveRequesterId = canSubmitOnBehalf ? requesterUserId : user!.id
       const today = new Date().toISOString().split('T')[0]
       const { data, error } = await supabase
         .from('shifts')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', effectiveRequesterId)
         .gte('date', today)
         .order('date')
+        .limit(30)
 
       if (error) throw error
       setMyShifts(data || [])
+      setMyShiftId('')
     } catch (err) {
-      console.error('Error fetching my shifts:', err)
+      console.error('Error fetching requester shifts:', err)
     }
   }
 
@@ -87,6 +135,7 @@ export default function CreateSwapRequest() {
         .eq('user_id', targetUserId)
         .gte('date', today)
         .order('date')
+        .limit(30)
 
       if (error) throw error
       setTargetShifts(data || [])
@@ -98,45 +147,33 @@ export default function CreateSwapRequest() {
     }
   }
 
-  const formatShiftOption = (shift: Shift) => {
-    const date = new Date(shift.date).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-    return `${date} - ${SHIFT_TYPE_LABELS[shift.shift_type]}`
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
     if (!targetUserId) {
-      setError('Please select a target user')
+      setError('Please select an agent to swap with')
       return
     }
 
-    if (!myShiftId) {
-      setError('Please select your shift date')
+    if (!myShiftId || !targetShiftId) {
+      setError('Please select both shifts to swap')
       return
     }
 
-    if (!targetShiftId) {
-      setError('Please select their shift date')
-      return
-    }
+    // Use selected requester ID (for WFM/TL submitting on behalf) or current user ID
+    const effectiveRequesterId = canSubmitOnBehalf ? requesterUserId : user!.id
 
     setLoading(true)
     try {
       const { error: insertError } = await supabase
         .from('swap_requests')
         .insert({
-          requester_id: user!.id,
-          target_user_id: targetUserId,
+          requester_id: effectiveRequesterId,
           requester_shift_id: myShiftId,
+          target_id: targetUserId,
           target_shift_id: targetShiftId,
-          status: 'pending_acceptance'
+          status: 'pending_target'
         })
 
       if (insertError) throw insertError
@@ -150,65 +187,74 @@ export default function CreateSwapRequest() {
     }
   }
 
+  const formatShiftOption = (shift: Shift) => {
+    const date = new Date(shift.date).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    })
+    return `${date} - ${SHIFT_TYPE_LABELS[shift.shift_type]}`
+  }
+
+  // Get the name of the selected requester for display
+  const getRequesterName = () => {
+    if (!canSubmitOnBehalf) return user?.name
+    const selectedUser = allUsers.find(u => u.id === requesterUserId)
+    return selectedUser?.name || user?.name
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">New Swap Request</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Request to swap shifts with a colleague
-        </p>
-      </div>
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h1 className="text-xl font-semibold text-gray-900">New Swap Request</h1>
+        </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
-          <div>
-            <label htmlFor="targetUser" className="block text-sm font-medium text-gray-700">
-              Select Colleague
-            </label>
-            {loadingAgents ? (
-              <div className="mt-1 flex items-center text-sm text-gray-500">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"></div>
-                Loading agents...
-              </div>
-            ) : (
+          {/* Requester selector for WFM/TL roles */}
+          {canSubmitOnBehalf && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Submit Request For (Requester)
+              </label>
               <select
-                id="targetUser"
-                value={targetUserId}
-                onChange={(e) => setTargetUserId(e.target.value)}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                required
+                value={requesterUserId}
+                onChange={(e) => setRequesterUserId(e.target.value)}
+                disabled={loadingAllUsers}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               >
-                <option value="">Select a colleague...</option>
-                {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </option>
-                ))}
+                {loadingAllUsers ? (
+                  <option>Loading users...</option>
+                ) : (
+                  allUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} {u.id === user?.id ? '(You)' : `(${u.role})`}
+                    </option>
+                  ))
+                )}
               </select>
-            )}
-            {agents.length === 0 && !loadingAgents && (
-              <p className="mt-1 text-sm text-gray-500">No other agents available</p>
-            )}
-          </div>
+              <p className="mt-1 text-sm text-gray-500">
+                As a {user?.role?.toUpperCase()}, you can submit swap requests on behalf of any user.
+              </p>
+            </div>
+          )}
 
           <div>
-            <label htmlFor="myShift" className="block text-sm font-medium text-gray-700">
-              Your Shift Date
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {getRequesterName()}'s Shift to Swap
             </label>
             <select
-              id="myShift"
               value={myShiftId}
               onChange={(e) => setMyShiftId(e.target.value)}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             >
-              <option value="">Select your shift...</option>
+              <option value="">Select a shift</option>
               {myShifts.map((shift) => (
                 <option key={shift.id} value={shift.id}>
                   {formatShiftOption(shift)}
@@ -216,55 +262,70 @@ export default function CreateSwapRequest() {
               ))}
             </select>
             {myShifts.length === 0 && (
-              <p className="mt-1 text-sm text-gray-500">No upcoming shifts available</p>
+              <p className="mt-1 text-sm text-gray-500">No upcoming shifts found</p>
             )}
           </div>
 
           <div>
-            <label htmlFor="targetShift" className="block text-sm font-medium text-gray-700">
-              Their Shift Date
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Swap With Agent
             </label>
-            {loadingShifts ? (
-              <div className="mt-1 flex items-center text-sm text-gray-500">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"></div>
-                Loading shifts...
-              </div>
-            ) : (
+            <select
+              value={targetUserId}
+              onChange={(e) => setTargetUserId(e.target.value)}
+              disabled={loadingAgents}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="">Select an agent</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}
+                </option>
+              ))}
+            </select>
+            {loadingAgents && (
+              <p className="mt-1 text-sm text-gray-500">Loading agents...</p>
+            )}
+          </div>
+
+          {targetUserId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Target Agent's Shift
+              </label>
               <select
-                id="targetShift"
                 value={targetShiftId}
                 onChange={(e) => setTargetShiftId(e.target.value)}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                disabled={!targetUserId}
-                required
+                disabled={loadingShifts}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               >
-                <option value="">
-                  {targetUserId ? 'Select their shift...' : 'Select a colleague first'}
-                </option>
+                <option value="">Select a shift</option>
                 {targetShifts.map((shift) => (
                   <option key={shift.id} value={shift.id}>
                     {formatShiftOption(shift)}
                   </option>
                 ))}
               </select>
-            )}
-            {targetUserId && targetShifts.length === 0 && !loadingShifts && (
-              <p className="mt-1 text-sm text-gray-500">No upcoming shifts available for this colleague</p>
-            )}
-          </div>
+              {loadingShifts ? (
+                <p className="mt-1 text-sm text-gray-500">Loading shifts...</p>
+              ) : targetShifts.length === 0 ? (
+                <p className="mt-1 text-sm text-gray-500">No upcoming shifts found</p>
+              ) : null}
+            </div>
+          )}
 
-          <div className="flex items-center justify-end space-x-4">
+          <div className="flex justify-end space-x-3">
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              onClick={() => navigate('/dashboard')}
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading || !targetUserId || !myShiftId || !targetShiftId}
-              className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || !myShiftId || !targetShiftId}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
             >
               {loading ? 'Submitting...' : 'Submit Request'}
             </button>
