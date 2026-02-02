@@ -243,43 +243,81 @@ export default function SwapRequestDetail() {
 
       if (updateError) throw updateError
 
-      // If fully approved, execute the swap by exchanging shift_types on both dates
+      // If fully approved, execute the swap across ALL 4 shift records
       if (newStatus === 'approved' && requesterShift && targetShift && request) {
-        // A swap means "I'll work your shift, you work mine"
-        // We need to swap shift_types on BOTH dates for BOTH users
+        // A swap means both users exchange their shift types on BOTH dates
         //
         // Example:
-        // Before: Agent X has 2-Feb (AM), Agent Y has 7-Feb (PM)
-        // We also need: Agent X's 7-Feb shift and Agent Y's 2-Feb shift
-        // After swap:
-        //   - Agent X: 2-Feb gets Y's type, 7-Feb gets Y's original type
-        //   - Agent Y: 2-Feb gets X's type, 7-Feb gets X's original type
+        // Before: Agent X: 2-Feb (AM), 7-Feb (OFF) | Agent Y: 2-Feb (PM), 7-Feb (PM)
+        // Swapping "Agent X's 2-Feb" with "Agent Y's 7-Feb"
+        // After:  Agent X: 2-Feb (PM), 7-Feb (PM) | Agent Y: 2-Feb (AM), 7-Feb (OFF)
         //
-        // Simplified: Just swap the shift_types of the two selected shifts
-        // requesterShift gets targetShift's type, and vice versa
+        // We need to:
+        // 1. Get all 4 shifts (both users on both dates)
+        // 2. Swap shift_types for both users on both dates
 
-        const requesterShiftType = requesterShift.shift_type
-        const targetShiftType = targetShift.shift_type
+        const requesterDate = requesterShift.date
+        const targetDate = targetShift.date
+        const requesterId = request.requester_id
+        const targetUserId = request.target_user_id
 
-        // Update requester's shift to have target's shift_type
-        const { error: reqShiftError } = await supabase
+        // Get Agent Y's shift on requester's date (2-Feb)
+        const { data: targetOnRequesterDate, error: torError } = await supabase
           .from('shifts')
-          .update({ 
-            shift_type: targetShiftType
-          })
-          .eq('id', requesterShift.id)
+          .select('*')
+          .eq('user_id', targetUserId)
+          .eq('date', requesterDate)
+          .single()
 
-        if (reqShiftError) throw reqShiftError
-
-        // Update target's shift to have requester's shift_type
-        const { error: tgtShiftError } = await supabase
+        // Get Agent X's shift on target's date (7-Feb)
+        const { data: requesterOnTargetDate, error: rotError } = await supabase
           .from('shifts')
-          .update({ 
-            shift_type: requesterShiftType
-          })
-          .eq('id', targetShift.id)
+          .select('*')
+          .eq('user_id', requesterId)
+          .eq('date', targetDate)
+          .single()
 
-        if (tgtShiftError) throw tgtShiftError
+        // Store original shift types
+        const requesterShiftTypeOnReqDate = requesterShift.shift_type // Agent X on 2-Feb
+        const targetShiftTypeOnTgtDate = targetShift.shift_type // Agent Y on 7-Feb
+        const targetShiftTypeOnReqDate = targetOnRequesterDate?.shift_type // Agent Y on 2-Feb
+        const requesterShiftTypeOnTgtDate = requesterOnTargetDate?.shift_type // Agent X on 7-Feb
+
+        // Update 1: Agent X on requester date (2-Feb) gets Agent Y's shift type from that date
+        if (targetShiftTypeOnReqDate) {
+          const { error } = await supabase
+            .from('shifts')
+            .update({ shift_type: targetShiftTypeOnReqDate })
+            .eq('id', requesterShift.id)
+          if (error) throw error
+        }
+
+        // Update 2: Agent Y on requester date (2-Feb) gets Agent X's shift type from that date
+        if (targetOnRequesterDate) {
+          const { error } = await supabase
+            .from('shifts')
+            .update({ shift_type: requesterShiftTypeOnReqDate })
+            .eq('id', targetOnRequesterDate.id)
+          if (error) throw error
+        }
+
+        // Update 3: Agent X on target date (7-Feb) gets Agent Y's shift type from that date
+        if (requesterOnTargetDate && targetShiftTypeOnTgtDate) {
+          const { error } = await supabase
+            .from('shifts')
+            .update({ shift_type: targetShiftTypeOnTgtDate })
+            .eq('id', requesterOnTargetDate.id)
+          if (error) throw error
+        }
+
+        // Update 4: Agent Y on target date (7-Feb) gets Agent X's shift type from that date
+        if (requesterShiftTypeOnTgtDate) {
+          const { error } = await supabase
+            .from('shifts')
+            .update({ shift_type: requesterShiftTypeOnTgtDate })
+            .eq('id', targetShift.id)
+          if (error) throw error
+        }
       }
 
       // Create system comment
