@@ -22,14 +22,16 @@ const STATUS_COLORS: Record<LeaveRequestStatus, string> = {
   pending_tl: 'bg-blue-100 text-blue-800',
   pending_wfm: 'bg-purple-100 text-purple-800',
   approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800'
+  rejected: 'bg-red-100 text-red-800',
+  denied: 'bg-orange-100 text-orange-800'
 }
 
 const STATUS_LABELS: Record<LeaveRequestStatus, string> = {
   pending_tl: 'Pending TL',
   pending_wfm: 'Pending WFM',
   approved: 'Approved',
-  rejected: 'Rejected'
+  rejected: 'Rejected',
+  denied: 'Denied (Insufficient Balance)'
 }
 
 const ITEMS_PER_PAGE = 10
@@ -56,40 +58,43 @@ export default function LeaveRequests() {
   const fetchRequests = async () => {
     setLoading(true)
     try {
+      // Build the query
       let query = supabase
         .from('leave_requests')
-        .select(`
-          *,
-          user:users!leave_requests_user_id_fkey(*)
-        `, { count: 'exact' })
+        .select('*, user:users!leave_requests_user_id_fkey(*)', { count: 'exact' })
 
-      // Agents see only their own requests, managers see all
+      // If not a manager, only show own requests
       if (!isManager) {
         query = query.eq('user_id', user!.id)
       }
 
+      // Apply date filters
       if (startDate) {
         query = query.gte('start_date', startDate)
       }
       if (endDate) {
         query = query.lte('end_date', endDate)
       }
+
+      // Apply leave type filter
       if (leaveTypeFilter) {
         query = query.eq('leave_type', leaveTypeFilter)
       }
 
-      query = query
-        .order('created_at', { ascending: false })
-        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
+      // Apply pagination
+      const from = (page - 1) * ITEMS_PER_PAGE
+      const to = from + ITEMS_PER_PAGE - 1
 
       const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to)
 
       if (error) throw error
 
       setRequests(data || [])
       setTotalCount(count || 0)
-    } catch (error) {
-      console.error('Error fetching leave requests:', error)
+    } catch (err) {
+      console.error('Error fetching leave requests:', err)
     } finally {
       setLoading(false)
     }
@@ -99,10 +104,18 @@ export default function LeaveRequests() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+      day: 'numeric'
     })
+  }
+
+  const calculateDays = (start: string, end: string) => {
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return diffDays
   }
 
   const clearFilters = () => {
@@ -113,19 +126,19 @@ export default function LeaveRequests() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Leave Requests</h1>
         <button
-          onClick={() => navigate('/leave-requests/new')}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          onClick={() => navigate('/leave/new')}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
         >
           New Request
         </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
@@ -133,7 +146,7 @@ export default function LeaveRequests() {
               type="date"
               value={startDate}
               onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full border rounded-md px-3 py-2"
             />
           </div>
           <div>
@@ -142,7 +155,7 @@ export default function LeaveRequests() {
               type="date"
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full border rounded-md px-3 py-2"
             />
           </div>
           <div>
@@ -150,7 +163,7 @@ export default function LeaveRequests() {
             <select
               value={leaveTypeFilter}
               onChange={(e) => { setLeaveTypeFilter(e.target.value as LeaveType | ''); setPage(1) }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full border rounded-md px-3 py-2"
             >
               <option value="">All Types</option>
               {LEAVE_TYPES.map(type => (
@@ -161,7 +174,7 @@ export default function LeaveRequests() {
           <div className="flex items-end">
             <button
               onClick={clearFilters}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors"
             >
               Clear Filters
             </button>
@@ -169,121 +182,118 @@ export default function LeaveRequests() {
         </div>
       </div>
 
-      {/* Requests List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          </div>
-        ) : requests.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            No leave requests found
-          </div>
-        ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                {isManager && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Employee
-                  </th>
-                )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Leave Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Duration
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {requests.map((request) => (
-                <tr
-                  key={request.id}
-                  onClick={() => navigate(`/leave-requests/${request.id}`)}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
-                >
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      ) : requests.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <p className="text-gray-500">No leave requests found</p>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
                   {isManager && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{request.user?.name}</div>
-                      <div className="text-sm text-gray-500">{request.user?.email}</div>
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Employee
+                    </th>
                   )}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{LEAVE_TYPE_LABELS[request.leave_type]}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {formatDate(request.start_date)} - {formatDate(request.end_date)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[request.status]}`}>
-                      {STATUS_LABELS[request.status]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(request.created_at)}
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Dates
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Days
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Submitted
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {requests.map((request) => (
+                  <tr key={request.id} className="hover:bg-gray-50">
+                    {isManager && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{request.user?.name}</div>
+                        <div className="text-sm text-gray-500">{request.user?.email}</div>
+                      </td>
+                    )}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">{LEAVE_TYPE_LABELS[request.leave_type]}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">
+                        {formatDate(request.start_date)} - {formatDate(request.end_date)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">
+                        {calculateDays(request.start_date, request.end_date)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${STATUS_COLORS[request.status]}`}>
+                        {STATUS_LABELS[request.status]}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(request.created_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => navigate(`/leave/${request.id}`)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(page - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
-                  <span className="font-medium">{Math.min(page * ITEMS_PER_PAGE, totalCount)}</span> of{' '}
-                  <span className="font-medium">{totalCount}</span> results
-                </p>
-              </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4">
+              <p className="text-sm text-gray-700">
+                Showing {((page - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(page * ITEMS_PER_PAGE, totalCount)} of {totalCount} results
+              </p>
               <div className="flex space-x-2">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-1 border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                 >
                   Previous
                 </button>
+                <span className="px-3 py-1 text-gray-700">
+                  Page {page} of {totalPages}
+                </span>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-1 border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                 >
                   Next
                 </button>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
