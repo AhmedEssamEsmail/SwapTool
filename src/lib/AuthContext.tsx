@@ -35,6 +35,7 @@ function getUserFriendlyError(error: any): Error {
   if (message.includes('invalid email')) return new Error('Please enter a valid email address.')
   if (message.includes('rate limit')) return new Error('Too many login attempts. Please wait a moment.')
   if (message.includes('network') || message.includes('fetch')) return new Error('Network error. Check your connection.')
+  if (message.includes('abort')) return new Error('The request was cancelled. Please try again.')
 
   return new Error(errorMessage)
 }
@@ -47,17 +48,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAuthenticated = !!session && !!user
 
-  // Improved: fetchUserProfile now returns the data instead of just setting state
-  // This allows us to handle the loading state more predictably
+  // Fetches the application profile from the 'profiles' table (renamed from 'users' to match Supabase convention)
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (error) throw error
+      if (error) {
+        // Handle AbortError specifically to avoid console noise
+        if (error.message?.includes('AbortError')) return null;
+        throw error;
+      }
       return data as User
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -82,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (mounted) setUser(profile)
           }
         }
+      } catch (error) {
+        console.error('Initialization error:', error)
       } finally {
         if (mounted) setLoading(false)
       }
@@ -90,22 +96,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (mounted) {
+      if (!mounted) return;
+
+      if (session?.user) {
         setSession(session)
-        setSupabaseUser(session?.user ?? null)
+        setSupabaseUser(session.user)
         
-        if (session?.user) {
-          // We stay in 'loading' state while fetching the DB profile
-          // This prevents the ProtectedRoute from redirecting to /login
-          const profile = await fetchUserProfile(session.user.id)
-          if (mounted) {
-            setUser(profile)
-            setLoading(false)
-          }
-        } else {
-          setUser(null)
+        // Fetch profile and update state
+        const profile = await fetchUserProfile(session.user.id)
+        if (mounted) {
+          setUser(profile)
           setLoading(false)
         }
+      } else {
+        setSession(null)
+        setSupabaseUser(null)
+        setUser(null)
+        setLoading(false)
       }
     })
 
@@ -141,7 +148,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.session?.user) {
         setSession(data.session)
         setSupabaseUser(data.session.user)
-        // Ensure the profile is in state before the promise resolves
         const profile = await fetchUserProfile(data.session.user.id)
         setUser(profile)
       }
@@ -156,12 +162,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    setLoading(true)
-    await supabase.auth.signOut()
-    setUser(null)
-    setSupabaseUser(null)
-    setSession(null)
-    setLoading(false)
+    try {
+      setLoading(true)
+      await supabase.auth.signOut()
+    } finally {
+      setUser(null)
+      setSupabaseUser(null)
+      setSession(null)
+      setLoading(false)
+    }
   }
 
   return (
