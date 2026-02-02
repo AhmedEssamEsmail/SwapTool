@@ -102,7 +102,10 @@ export default function Login() {
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value)
-                  setError(null) // Clear error when user types
+                  // Only clear error if not currently loading (not during submission)
+                  if (!loading) {
+                    setError(null)
+                  }
                 }}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 placeholder="you@dabdoob.com"
@@ -121,7 +124,10 @@ export default function Login() {
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value)
-                  setError(null) // Clear error when user types
+                  // Only clear error if not currently loading (not during submission)
+                  if (!loading) {
+                    setError(null)
+                  }
                 }}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 placeholder="********"
@@ -165,18 +171,6 @@ export default function Login() {
               </div>
             </div>
           )}
-
-          {/* Debug button - REMOVE THIS AFTER TESTING */}
-          <button
-            type="button"
-            onClick={() => {
-              console.log('Test button clicked')
-              setError('Test error message - if you see this, error display is working!')
-            }}
-            className="text-xs text-gray-500 underline"
-          >
-            Test Error Display (Debug)
-          </button>
         </form>
       </div>
     </div>
