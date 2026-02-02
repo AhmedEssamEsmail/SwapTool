@@ -295,49 +295,50 @@ export default function LeaveRequestDetail() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     )
   }
 
   if (!request || !requester) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="bg-red-50 text-red-700 p-4 rounded-lg">
-          {error || 'Request not found'}
-        </div>
+      <div className="text-center py-12">
+        <p className="text-gray-500">{error || 'Request not found'}</p>
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {/* Back Button - Styled like SwapRequestDetail */}
-      <button
-        onClick={() => navigate('/leave')}
-        className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
-      >
-        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to All Requests
-      </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <button
+            onClick={() => navigate('/leave')}
+            className="text-gray-500 hover:text-gray-700 mb-2 flex items-center gap-1"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Leave Request Details</h1>
+        </div>
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[request.status]}`}>
+          {statusLabels[request.status]}
+        </span>
+      </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
           {error}
         </div>
       )}
 
       {/* Request Details */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="flex justify-between items-start mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Leave Request Details</h1>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[request.status]}`}>
-            {statusLabels[request.status]}
-          </span>
-        </div>
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Request Details</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -376,37 +377,6 @@ export default function LeaveRequestDetail() {
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="mt-6 flex gap-3">
-          {canApprove() && (
-            <button
-              onClick={handleApprove}
-              disabled={submitting}
-              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
-            >
-              {submitting ? 'Processing...' : 'Approve'}
-            </button>
-          )}
-          {canReject() && (
-            <button
-              onClick={handleReject}
-              disabled={submitting}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
-            >
-              {submitting ? 'Processing...' : 'Reject'}
-            </button>
-          )}
-          {canAskForException() && (
-            <button
-              onClick={handleAskForException}
-              disabled={requestingException}
-              className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50"
-            >
-              {requestingException ? 'Requesting...' : 'Ask for Exception'}
-            </button>
-          )}
-        </div>
-
         {/* Denied status explanation */}
         {request.status === 'denied' && (
           <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
@@ -418,8 +388,44 @@ export default function LeaveRequestDetail() {
         )}
       </div>
 
+      {/* Action Buttons */}
+      {(canApprove() || canReject() || canAskForException()) && (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
+          <div className="flex flex-wrap gap-3">
+            {canApprove() && (
+              <button
+                onClick={handleApprove}
+                disabled={submitting}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Processing...' : 'Approve'}
+              </button>
+            )}
+            {canReject() && (
+              <button
+                onClick={handleReject}
+                disabled={submitting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Processing...' : 'Reject'}
+              </button>
+            )}
+            {canAskForException() && (
+              <button
+                onClick={handleAskForException}
+                disabled={requestingException}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {requestingException ? 'Requesting...' : 'Ask for Exception'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Approval Timeline */}
-      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Approval Timeline</h2>
         <div className="space-y-4">
           {/* Created Step */}
@@ -548,8 +554,8 @@ export default function LeaveRequestDetail() {
         </div>
       </div>
 
-      {/* Comments Section - Styled like SwapRequestDetail */}
-      <div className="bg-white rounded-lg shadow p-6">
+      {/* Comments Section */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Comments</h2>
 
         <div className="space-y-4 mb-6">
@@ -575,24 +581,23 @@ export default function LeaveRequestDetail() {
           )}
         </div>
 
-        {/* Add Comment */}
-        <div className="flex gap-2">
+        {/* Add Comment Form */}
+        <form onSubmit={(e) => { e.preventDefault(); handleAddComment(); }} className="flex gap-2">
           <input
             type="text"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Add a comment..."
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
           />
           <button
-            onClick={handleAddComment}
+            type="submit"
             disabled={submitting || !newComment.trim()}
             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Adding...' : 'Add'}
+            {submitting ? 'Sending...' : 'Send'}
           </button>
-        </div>
+        </form>
       </div>
     </div>
   )
