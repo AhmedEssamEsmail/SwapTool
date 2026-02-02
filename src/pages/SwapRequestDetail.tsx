@@ -64,7 +64,7 @@ export default function SwapRequestDetail() {
       // Fetch swap request
       const { data: requestData, error: requestError } = await supabase
         .from('swap_requests')
-        .select('*')
+        .select('*, requester_original_date, requester_original_shift_type, target_original_date, target_original_shift_type')
         .eq('id', id)
         .single()
 
@@ -243,27 +243,31 @@ export default function SwapRequestDetail() {
 
       if (updateError) throw updateError
 
-      // If fully approved, swap the shifts
-      if (newStatus === 'approved' && requesterShift && targetShift) {
-        // Update requester's shift to target's shift type and mark as swapped
-        await supabase
+      // If fully approved, execute the swap by exchanging user_ids on the shifts
+      if (newStatus === 'approved' && requesterShift && targetShift && request) {
+        // A swap means:
+        // - Requester gives their shift to target (requester's shift now belongs to target)
+        // - Target gives their shift to requester (target's shift now belongs to requester)
+        
+        // Update requester's shift - assign to target user
+        const { error: reqShiftError } = await supabase
           .from('shifts')
           .update({ 
-            shift_type: targetShift.shift_type,
-            swapped_with_user_id: targetUser?.id,
-            original_user_id: requesterShift.original_user_id || requester?.id
+            user_id: request.target_user_id
           })
           .eq('id', requesterShift.id)
 
-        // Update target's shift to requester's shift type and mark as swapped
-        await supabase
+        if (reqShiftError) throw reqShiftError
+
+        // Update target's shift - assign to requester
+        const { error: tgtShiftError } = await supabase
           .from('shifts')
           .update({ 
-            shift_type: requesterShift.shift_type,
-            swapped_with_user_id: requester?.id,
-            original_user_id: targetShift.original_user_id || targetUser?.id
+            user_id: request.requester_id
           })
           .eq('id', targetShift.id)
+
+        if (tgtShiftError) throw tgtShiftError
       }
 
       // Create system comment
