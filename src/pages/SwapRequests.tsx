@@ -186,11 +186,8 @@ export default function SwapRequests() {
                     {STATUS_LABELS[request.status]}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 space-y-1">
+                <div className="text-xs text-gray-500">
                   <p>Created: {formatDate(request.created_at)}</p>
-                  {request.notes && (
-                    <p className="text-gray-600 line-clamp-2">Note: {request.notes}</p>
-                  )}
                 </div>
               </div>
             ))}
