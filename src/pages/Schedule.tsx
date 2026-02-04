@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { User, Shift, ShiftType, LeaveType, LeaveTypeConfig, LeaveRequest } from '../types'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWithinInterval, parseISO } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWithinInterval, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns'
 
 const shiftColors: Record<ShiftType, string> = {
   AM: 'bg-blue-100 text-blue-800',
@@ -34,7 +34,6 @@ const leaveLabels: Record<LeaveType, string> = {
   bereavement: 'Bereav.',
 }
 
-// Mapping from display labels to database enum values
 const labelToLeaveTypeEnum: Record<string, LeaveType> = {
   'Sick': 'sick',
   'Annual': 'annual',
@@ -71,6 +70,7 @@ interface ShiftWithSwap extends Shift {
 export default function Schedule() {
   const { user } = useAuth()
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('week') // Default to week view on mobile
   const [users, setUsers] = useState<User[]>([])
   const [shifts, setShifts] = useState<ShiftWithSwap[]>([])
   const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([])
@@ -95,9 +95,13 @@ export default function Schedule() {
   const [selectedUserId, setSelectedUserId] = useState<string>('all')
 
   const canEdit = user?.role === 'tl' || user?.role === 'wfm'
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  
+  // Calculate date range based on view mode
+  const dateRange = viewMode === 'month' 
+    ? { start: startOfMonth(currentDate), end: endOfMonth(currentDate) }
+    : { start: startOfWeek(currentDate, { weekStartsOn: 0 }), end: endOfWeek(currentDate, { weekStartsOn: 0 }) }
+  
+  const daysInRange = eachDayOfInterval({ start: dateRange.start, end: dateRange.end })
   
   // Filter users based on selection
   const filteredUsers = selectedUserId === 'all' ? users : users.filter(u => u.id === selectedUserId)
@@ -107,7 +111,7 @@ export default function Schedule() {
     if (canEdit) {
       fetchLeaveTypes()
     }
-  }, [currentDate, user, canEdit])
+  }, [currentDate, viewMode, user, canEdit])
 
   useEffect(() => {
     if (activeTab === 'leave-types' && canEdit) {
@@ -131,8 +135,8 @@ export default function Schedule() {
 
       setUsers(usersData || [])
 
-      const startDate = format(monthStart, 'yyyy-MM-dd')
-      const endDate = format(monthEnd, 'yyyy-MM-dd')
+      const startDate = format(dateRange.start, 'yyyy-MM-dd')
+      const endDate = format(dateRange.end, 'yyyy-MM-dd')
 
       let shiftsQuery = supabase
         .from('shifts')
@@ -449,6 +453,14 @@ export default function Schedule() {
     }
   }
 
+  function navigateDate(direction: 'prev' | 'next') {
+    if (viewMode === 'month') {
+      setCurrentDate(direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1))
+    } else {
+      setCurrentDate(direction === 'prev' ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1))
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -459,8 +471,8 @@ export default function Schedule() {
 
   return (
     <div className="space-y-4 pb-4 w-full overflow-hidden">
-      <div className="sm:flex sm:items-start sm:justify-between">
-        <div className="mb-3 sm:mb-0">
+      <div className="space-y-3">
+        <div>
           <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
           <p className="mt-1 text-sm text-gray-500">
             {canEdit ? 'View and manage team schedules' : 'View your schedule'}
@@ -468,13 +480,13 @@ export default function Schedule() {
         </div>
         
         {canEdit && (
-          <div className="w-full sm:w-auto sm:mt-0">
+          <div className="w-full">
             <label htmlFor="agent-filter" className="sr-only">Filter by agent</label>
             <select
               id="agent-filter"
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
-              className="block w-full sm:w-64 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
             >
               <option value="all">All Agents</option>
               {users.map(u => (
@@ -514,95 +526,106 @@ export default function Schedule() {
 
       {activeTab === 'schedule' && (
         <>
-          {/* Month navigation */}
-          <div className="flex items-center justify-between bg-white rounded-lg shadow px-3 py-2">
-            <button
-              onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <h2 className="text-base font-semibold text-gray-900">
-              {format(currentDate, 'MMMM yyyy')}
-            </h2>
-            <button
-              onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+          {/* View Mode Toggle */}
+          <div className="bg-white rounded-lg shadow p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigateDate('prev')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h2 className="text-sm font-semibold text-gray-900 min-w-[140px] text-center">
+                {viewMode === 'month' 
+                  ? format(currentDate, 'MMMM yyyy')
+                  : `${format(dateRange.start, 'MMM d')} - ${format(dateRange.end, 'MMM d, yyyy')}`
+                }
+              </h2>
+              <button
+                onClick={() => navigateDate('next')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-3 py-1 text-xs font-medium rounded ${
+                  viewMode === 'week' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+                }`}
+              >
+                Week
+              </button>
+              <button
+                onClick={() => setViewMode('month')}
+                className={`px-3 py-1 text-xs font-medium rounded ${
+                  viewMode === 'month' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+                }`}
+              >
+                Month
+              </button>
+            </div>
           </div>
 
-          {/* Schedule grid - Mobile optimized with horizontal scroll */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <div style={{ minWidth: '600px' }}>
-                <table className="w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0 z-10">
-                    <tr>
-                      <th className="sticky left-0 z-20 bg-gray-50 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-24 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                        Name
-                      </th>
-                      {daysInMonth.map(day => (
-                        <th
+          {/* Schedule - Card View for Mobile */}
+          <div className="space-y-3">
+            {filteredUsers.map(u => (
+              <div key={u.id} className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                  <p className="text-sm font-medium text-gray-900">{u.name}</p>
+                </div>
+                <div className="p-2">
+                  <div className="grid grid-cols-7 gap-1">
+                    {daysInRange.map(day => {
+                      const shift = getShiftForUserAndDate(u.id, day)
+                      const leave = getLeaveForUserAndDate(u.id, day)
+                      const isOnLeave = !!leave
+                      
+                      return (
+                        <button
                           key={day.toISOString()}
-                          className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase min-w-[45px] bg-gray-50"
+                          onClick={() => handleShiftClick(u.id, day)}
+                          disabled={!canEdit}
+                          className={`aspect-square flex flex-col items-center justify-center p-1 rounded ${
+                            canEdit ? 'hover:bg-gray-50 cursor-pointer' : ''
+                          }`}
                         >
-                          <div className="text-[10px]">{format(day, 'EEE')}</div>
-                          <div className="text-gray-900 text-xs">{format(day, 'd')}</div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredUsers.map(u => (
-                      <tr key={u.id}>
-                        <td className="sticky left-0 z-10 bg-white px-2 py-2 text-xs font-medium text-gray-900 truncate w-24 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                          {u.name.split(' ')[0]}
-                        </td>
-                        {daysInMonth.map(day => {
-                          const shift = getShiftForUserAndDate(u.id, day)
-                          const leave = getLeaveForUserAndDate(u.id, day)
-                          const isOnLeave = !!leave
-                          
-                          return (
-                            <td
-                              key={day.toISOString()}
-                              className={`px-1 py-2 text-center ${canEdit ? 'cursor-pointer hover:bg-gray-50' : ''}`}
-                              onClick={() => handleShiftClick(u.id, day)}
-                              title={isOnLeave ? `On ${leave.leave_type} leave` : shift?.swapped_with_user_id ? `Swapped with ${swappedUserNames[shift.swapped_with_user_id]}` : undefined}
-                            >
-                              {isOnLeave ? (
-                                <span className={`inline-flex items-center px-1 py-0.5 rounded text-[10px] font-medium border ${leaveColors[leave.leave_type] || 'bg-gray-100 text-gray-800 border-gray-300'}`}>
-                                  {leaveLabels[leave.leave_type] || leave.leave_type}
+                          <div className="text-[10px] text-gray-500 mb-0.5">
+                            {format(day, 'd')}
+                          </div>
+                          <div className="text-center">
+                            {isOnLeave ? (
+                              <span className={`inline-block px-1 py-0.5 rounded text-[9px] font-medium border ${leaveColors[leave.leave_type] || 'bg-gray-100 text-gray-800 border-gray-300'}`}>
+                                {leaveLabels[leave.leave_type]?.substring(0, 3) || 'L'}
+                              </span>
+                            ) : shift ? (
+                              <div>
+                                <span className={`inline-block px-1 py-0.5 rounded text-[9px] font-medium ${shiftColors[shift.shift_type]}`}>
+                                  {shiftLabels[shift.shift_type]}
                                 </span>
-                              ) : shift ? (
-                                <div className="relative">
-                                  <span className={`inline-flex items-center px-1 py-0.5 rounded text-[10px] font-medium ${shiftColors[shift.shift_type]}`}>
-                                    {shiftLabels[shift.shift_type]}
-                                  </span>
-                                  {shift.swapped_with_user_id && (
-                                    <div className="text-[9px] text-gray-500 mt-0.5">↔</div>
-                                  )}
-                                </div>
-                              ) : canEdit ? (
-                                <span className="text-gray-300 text-xs">+</span>
-                              ) : (
-                                <span className="text-gray-300 text-xs">-</span>
-                              )}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                                {shift.swapped_with_user_id && (
+                                  <div className="text-[8px] text-gray-500">↔</div>
+                                )}
+                              </div>
+                            ) : canEdit ? (
+                              <span className="text-gray-300 text-xs">+</span>
+                            ) : (
+                              <span className="text-gray-300 text-xs">-</span>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
 
           {/* Legend */}
@@ -611,7 +634,7 @@ export default function Schedule() {
             <div className="space-y-2">
               <div>
                 <h4 className="text-xs font-medium text-gray-500 uppercase mb-1">Shifts</h4>
-                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {Object.entries(shiftColors).map(([type, color]) => (
                     <div key={type} className="flex items-center gap-1">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>
@@ -629,7 +652,7 @@ export default function Schedule() {
               </div>
               <div>
                 <h4 className="text-xs font-medium text-gray-500 uppercase mb-1">Leave Types</h4>
-                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {Object.entries(leaveColors).map(([type, color]) => (
                     <div key={type} className="flex items-center gap-1">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${color}`}>
@@ -653,14 +676,14 @@ export default function Schedule() {
 
       {activeTab === 'leave-types' && canEdit && (
         <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="px-4 py-4 border-b flex flex-col gap-3">
             <div>
               <h3 className="text-base font-medium text-gray-900">Leave Types</h3>
               <p className="mt-1 text-xs text-gray-500">Manage available leave types</p>
             </div>
             <button
               onClick={() => setShowAddLeaveType(true)}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+              className="w-full inline-flex items-center justify-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
             >
               Add Leave Type
             </button>
@@ -808,12 +831,12 @@ export default function Schedule() {
       {editingShift && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 sm:p-6">
+            <div className="p-4">
               <h3 className="text-base font-medium text-gray-900 mb-3">
                 {editingShift.existingLeave ? 'Edit Leave/Shift' : editingShift.shiftId ? 'Edit Shift' : 'Add Shift/Leave'}
               </h3>
               <p className="text-xs text-gray-500 mb-4">
-                Date: {format(new Date(editingShift.date), 'EEEE, MMMM d, yyyy')}
+                {format(new Date(editingShift.date), 'EEEE, MMMM d, yyyy')}
               </p>
               
               <div className="space-y-3">
