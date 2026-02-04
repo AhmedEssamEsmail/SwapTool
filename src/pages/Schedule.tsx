@@ -494,7 +494,7 @@ export default function Schedule() {
   }
 
   return (
-    <div className="space-y-6 w-full overflow-x-auto">
+    <div className="space-y-6 w-full min-w-0 overflow-x-hidden">
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
@@ -576,9 +576,9 @@ export default function Schedule() {
           </div>
 
           {/* Schedule grid */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full touch-pan-x">
-              <table className="divide-y divide-gray-200 min-w-max">
+          <div className="bg-white rounded-lg shadow overflow-hidden w-full max-w-full">
+            <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full max-w-full touch-pan-x overscroll-x-contain">
+              <table className="divide-y divide-gray-200 min-w-max w-full">
                 <thead className="bg-gray-50 sticky top-0 z-20">
                   <tr>
                     <th className="sticky left-0 z-30 bg-gray-50 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
