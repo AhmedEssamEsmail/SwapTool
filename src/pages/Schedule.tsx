@@ -577,7 +577,7 @@ export default function Schedule() {
 
           {/* Schedule grid */}
           <div className="bg-white rounded-lg shadow overflow-hidden w-full max-w-full">
-            <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full max-w-full touch-pan-x overscroll-x-contain">
+            <div className="min-h-screen overflow-x-visible">
               <table className="divide-y divide-gray-200 min-w-max w-full">
                 <thead className="bg-gray-50 sticky top-0 z-20">
                   <tr>
