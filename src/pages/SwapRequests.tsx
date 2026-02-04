@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import type { SwapRequest, User, SwapRequestStatus } from '../types'
+import { useAuth } from '../hooks/useAuth'
+import { SwapRequest, User, SwapRequestStatus } from '../types'
 
 interface SwapRequestWithUsers extends SwapRequest {
   requester: User
@@ -25,15 +25,11 @@ const STATUS_LABELS: Record<SwapRequestStatus, string> = {
   rejected: 'Rejected'
 }
 
-const ITEMS_PER_PAGE = 10
-
 export default function SwapRequests() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [requests, setRequests] = useState<SwapRequestWithUsers[]>([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
@@ -43,10 +39,12 @@ export default function SwapRequests() {
     if (user) {
       fetchRequests()
     }
-  }, [user, page, startDate, endDate])
+  }, [user, startDate, endDate])
 
   const fetchRequests = async () => {
+    if (!user) return
     setLoading(true)
+
     try {
       let query = supabase
         .from('swap_requests')
@@ -54,11 +52,11 @@ export default function SwapRequests() {
           *,
           requester:users!swap_requests_requester_id_fkey(*),
           target_user:users!swap_requests_target_user_id_fkey(*)
-        `, { count: 'exact' })
+        `)
+        .order('created_at', { ascending: false })
 
-      // Agents see only requests they're involved in, managers see all
       if (!isManager) {
-        query = query.or(`requester_id.eq.${user!.id},target_user_id.eq.${user!.id}`)
+        query = query.or(`requester_id.eq.${user.id},target_user_id.eq.${user.id}`)
       }
 
       if (startDate) {
@@ -68,16 +66,23 @@ export default function SwapRequests() {
         query = query.lte('created_at', endDate + 'T23:59:59')
       }
 
-      query = query
-        .order('created_at', { ascending: false })
-        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
-
-      const { data, error, count } = await query
+      const { data, error } = await query
 
       if (error) throw error
 
-      setRequests(data || [])
-      setTotalCount(count || 0)
+      // For managers, sort with pending approvals first
+      let sortedData = data || []
+      if (isManager) {
+        sortedData = [...sortedData].sort((a, b) => {
+          const aPending = a.status.startsWith('pending')
+          const bPending = b.status.startsWith('pending')
+          if (aPending && !bPending) return -1
+          if (!aPending && bPending) return 1
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        })
+      }
+
+      setRequests(sortedData as SwapRequestWithUsers[])
     } catch (error) {
       console.error('Error fetching swap requests:', error)
     } finally {
@@ -85,7 +90,10 @@ export default function SwapRequests() {
     }
   }
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+  const clearFilters = () => {
+    setStartDate('')
+    setEndDate('')
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -95,157 +103,97 @@ export default function SwapRequests() {
     })
   }
 
-  const clearFilters = () => {
-    setStartDate('')
-    setEndDate('')
-    setPage(1)
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 pb-4">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Swap Requests</h1>
-        <button
-          onClick={() => navigate('/swap-requests/new')}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          New Request
-        </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white rounded-lg shadow p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
             <input
+              id="start-date"
               type="date"
               value={startDate}
-              onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              onChange={(e) => setStartDate(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
             <input
+              id="end-date"
               type="date"
               value={endDate}
-              onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              onChange={(e) => setEndDate(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
             />
           </div>
-          <div className="flex items-end">
-            <button
-              onClick={clearFilters}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Clear Filters
-            </button>
-          </div>
         </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={clearFilters}
+            className="w-full sm:w-auto px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+          >
+            Clear Filters
+          </button>
+        )}
       </div>
 
       {/* Requests List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow">
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
           </div>
         ) : requests.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="p-8 text-center text-gray-500 text-sm">
             No swap requests found
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Requester
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Target
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {requests.map((request) => (
-                <tr
-                  key={request.id}
-                  onClick={() => navigate(`/swap-requests/${request.id}`)}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{request.requester?.name}</div>
-                    <div className="text-sm text-gray-500">{request.requester?.email}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{request.target_user?.name}</div>
-                    <div className="text-sm text-gray-500">{request.target_user?.email}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[request.status]}`}>
-                      {STATUS_LABELS[request.status]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(request.created_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+          <div className="divide-y divide-gray-200">
+            {requests.map((request) => (
+              <div
+                key={request.id}
+                onClick={() => navigate(`/swap-requests/${request.id}`)}
+                className="p-4 hover:bg-gray-50 cursor-pointer"
               >
-                Previous
-              </button>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(page - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
-                  <span className="font-medium">{Math.min(page * ITEMS_PER_PAGE, totalCount)}</span> of{' '}
-                  <span className="font-medium">{totalCount}</span> results
-                </p>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {request.requester?.name || 'Unknown'}
+                      </p>
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                      <p className="text-sm font-medium text-gray-900">
+                        {request.target_user?.name || 'Unknown'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {request.requester?.email || 'N/A'}
+                    </p>
+                  </div>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 whitespace-nowrap ${STATUS_COLORS[request.status]}`}>
+                    {STATUS_LABELS[request.status]}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p>Created: {formatDate(request.created_at)}</p>
+                  {request.notes && (
+                    <p className="text-gray-600 line-clamp-2">Note: {request.notes}</p>
+                  )}
+                </div>
               </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
         )}
       </div>
