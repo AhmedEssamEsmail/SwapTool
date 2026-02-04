@@ -137,8 +137,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div>
-      <div className="mb-8">
+    <div className="pb-4">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-1 text-sm text-gray-500">
           Welcome back, {user?.name}! Here's an overview of your shift management.
@@ -146,12 +146,12 @@ export default function Dashboard() {
       </div>
 
       {/* Action Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mb-8">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
         <button
           onClick={() => navigate('/swap-requests/create')}
           className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer text-left"
         >
-          <div className="p-6">
+          <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -161,8 +161,8 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-medium text-gray-900">New Swap Request</h3>
-                <p className="text-sm text-gray-500">Request to swap shifts with a colleague</p>
+                <h3 className="text-base font-medium text-gray-900">New Swap Request</h3>
+                <p className="text-xs text-gray-500">Request to swap shifts with a colleague</p>
               </div>
             </div>
           </div>
@@ -172,7 +172,7 @@ export default function Dashboard() {
           onClick={() => navigate('/leave-requests/create')}
           className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer text-left"
         >
-          <div className="p-6">
+          <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -182,8 +182,8 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-medium text-gray-900">New Leave Request</h3>
-                <p className="text-sm text-gray-500">Submit a new leave request</p>
+                <h3 className="text-base font-medium text-gray-900">New Leave Request</h3>
+                <p className="text-xs text-gray-500">Submit a new leave request</p>
               </div>
             </div>
           </div>
@@ -192,8 +192,8 @@ export default function Dashboard() {
 
       {/* Recent Swap Requests */}
       <div className="bg-white shadow rounded-lg mb-6">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-gray-900">Recent Swap Requests</h2>
+        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-base font-medium text-gray-900">Recent Swap Requests</h2>
           <Link
             to="/swap-requests"
             className="text-sm font-medium text-primary-600 hover:text-primary-500"
@@ -201,60 +201,49 @@ export default function Dashboard() {
             View All
           </Link>
         </div>
-        <div className="overflow-x-auto">
+        <div>
           {loading ? (
             <div className="p-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
             </div>
           ) : swapRequests.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No swap requests found</div>
+            <div className="p-8 text-center text-gray-500 text-sm">No swap requests found</div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requester</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {swapRequests.map((request) => (
-                  <tr
-                    key={request.id}
-                    onClick={() => navigate(`/swap-requests/${request.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {request.requester?.name || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {request.target_user?.name || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      Swap pending
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[request.status]}`}>
-                        {STATUS_LABELS[request.status]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(request.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            /* Mobile-friendly card layout */
+            <div className="divide-y divide-gray-200">
+              {swapRequests.map((request) => (
+                <div
+                  key={request.id}
+                  onClick={() => navigate(`/swap-requests/${request.id}`)}
+                  className="p-4 hover:bg-gray-50 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {request.requester?.name || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        → {request.target_user?.name || 'Unknown'}
+                      </p>
+                    </div>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 ${STATUS_COLORS[request.status]}`}>
+                      {STATUS_LABELS[request.status]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {formatDate(request.created_at)}
+                  </p>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
       {/* Recent Leave Requests */}
       <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-gray-900">Recent Leave Requests</h2>
+        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-base font-medium text-gray-900">Recent Leave Requests</h2>
           <Link
             to="/leave-requests"
             className="text-sm font-medium text-primary-600 hover:text-primary-500"
@@ -262,52 +251,44 @@ export default function Dashboard() {
             View All
           </Link>
         </div>
-        <div className="overflow-x-auto">
+        <div>
           {loading ? (
             <div className="p-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
             </div>
           ) : leaveRequests.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No leave requests found</div>
+            <div className="p-8 text-center text-gray-500 text-sm">No leave requests found</div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leave Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {leaveRequests.map((request) => (
-                  <tr
-                    key={request.id}
-                    onClick={() => navigate(`/leave-requests/${request.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {request.user?.name || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {LEAVE_TYPE_LABELS[request.leave_type]}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(request.start_date)} - {formatDate(request.end_date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[request.status]}`}>
-                        {STATUS_LABELS[request.status]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(request.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            /* Mobile-friendly card layout */
+            <div className="divide-y divide-gray-200">
+              {leaveRequests.map((request) => (
+                <div
+                  key={request.id}
+                  onClick={() => navigate(`/leave-requests/${request.id}`)}
+                  className="p-4 hover:bg-gray-50 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {request.user?.name || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {LEAVE_TYPE_LABELS[request.leave_type]}
+                      </p>
+                    </div>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 ${STATUS_COLORS[request.status]}`}>
+                      {STATUS_LABELS[request.status]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {formatDate(request.start_date)} - {formatDate(request.end_date)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Created {formatDate(request.created_at)}
+                  </p>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
