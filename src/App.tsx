@@ -17,6 +17,11 @@ import ScheduleUpload from './pages/ScheduleUpload'
 import LeaveBalances from './pages/LeaveBalances'
 import Unauthorized from './pages/Unauthorized'
 
+// NEW: Headcount pages
+import HeadcountDashboard from './pages/Headcount/HeadcountDashboard'
+import EmployeeDirectory from './pages/Headcount/EmployeeDirectory'
+import EmployeeDetail from './pages/Headcount/EmployeeDetail'
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth()
   
@@ -34,7 +39,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   // Check if user email is from allowed domain
   if (user.email && !user.email.endsWith('@dabdoob.com')) {
-    // Sign out user with invalid domain
     signOut()
     return <Navigate to="/unauthorized" replace />
   }
@@ -75,14 +79,40 @@ function WFMOnlyRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />
   }
   
-  // Check if user email is from allowed domain
   if (user.email && !user.email.endsWith('@dabdoob.com')) {
     signOut()
     return <Navigate to="/unauthorized" replace />
   }
   
-  // Only allow WFM users
   if (user.role !== 'wfm') {
+    return <Navigate to="/dashboard" replace />
+  }
+  
+  return <Layout>{children}</Layout>
+}
+
+// NEW: TL and WFM can view headcount, only WFM can edit
+function HeadcountRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading, signOut, canViewHeadcount } = useAuth()
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  
+  if (user.email && !user.email.endsWith('@dabdoob.com')) {
+    signOut()
+    return <Navigate to="/unauthorized" replace />
+  }
+  
+  if (!canViewHeadcount()) {
     return <Navigate to="/dashboard" replace />
   }
   
@@ -103,12 +133,10 @@ function App() {
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/schedule" element={<ProtectedRoute><Schedule /></ProtectedRoute>} />
           <Route path="/swap-requests" element={<ProtectedRoute><SwapRequests /></ProtectedRoute>} />
-          {/* Create routes must come BEFORE :id routes to prevent "create" from being matched as an ID */}
           <Route path="/swap-requests/create" element={<ProtectedRoute><CreateSwapRequest /></ProtectedRoute>} />
           <Route path="/swap-requests/new" element={<ProtectedRoute><CreateSwapRequest /></ProtectedRoute>} />
           <Route path="/swap-requests/:id" element={<ProtectedRoute><SwapRequestDetail /></ProtectedRoute>} />
           <Route path="/leave-requests" element={<ProtectedRoute><LeaveRequests /></ProtectedRoute>} />
-          {/* Create routes must come BEFORE :id routes to prevent "create" from being matched as an ID */}
           <Route path="/leave-requests/create" element={<ProtectedRoute><CreateLeaveRequest /></ProtectedRoute>} />
           <Route path="/leave-requests/new" element={<ProtectedRoute><CreateLeaveRequest /></ProtectedRoute>} />
           <Route path="/leave-requests/:id" element={<ProtectedRoute><LeaveRequestDetail /></ProtectedRoute>} />
@@ -118,10 +146,15 @@ function App() {
           {/* WFM only routes */}
           <Route path="/schedule/upload" element={<WFMOnlyRoute><ScheduleUpload /></WFMOnlyRoute>} />
           
+          {/* NEW: Headcount routes (TL view, WFM edit) */}
+          <Route path="/headcount" element={<HeadcountRoute><HeadcountDashboard /></HeadcountRoute>} />
+          <Route path="/headcount/employees" element={<HeadcountRoute><EmployeeDirectory /></HeadcountRoute>} />
+          <Route path="/headcount/employees/:id" element={<HeadcountRoute><EmployeeDetail /></HeadcountRoute>} />
+          
           {/* Redirect root to dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           
-          {/* Catch all - redirect to dashboard */}
+          {/* Catch all */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
