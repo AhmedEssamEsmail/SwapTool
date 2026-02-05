@@ -8,7 +8,7 @@ import type { HeadcountUser, Department } from '../../types'
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>()
   const { canEditHeadcount } = useAuth()
-  const { getEmployee, updateEmployee, loading } = useHeadcount()
+  const { getEmployee, updateEmployee, getDepartments, loading } = useHeadcount()
   const [employee, setEmployee] = useState<HeadcountUser | null>(null)
   const [departments, setDepartments] = useState<Department[]>([])
   const [isEditing, setIsEditing] = useState(false)
@@ -31,7 +31,7 @@ export default function EmployeeDetail() {
   }
 
   async function loadDepartments() {
-    const depts = await useHeadcount().getDepartments()
+    const depts = await getDepartments()
     setDepartments(depts)
   }
 
@@ -134,22 +134,22 @@ export default function EmployeeDetail() {
                 <p className="mt-1 text-gray-900">{employee.employee_id || 'Not assigned'}</p>
               )}
             </div>
-<div>
-  <label className="block text-sm font-medium text-gray-700">Role</label>
-  {isEditable ? (
-    <select
-      value={formData.role || 'agent'}
-      onChange={(e) => setFormData(f => ({ ...f, role: e.target.value as any }))}
-      className="mt-1 w-full border rounded-lg px-3 py-2"
-    >
-      <option value="agent">Agent</option>
-      <option value="tl">Team Lead</option>
-      <option value="wfm">WFM</option>
-    </select>
-  ) : (
-    <p className="mt-1 text-gray-900 uppercase">{employee.role}</p>
-  )}
-</div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Role</label>
+              {isEditable ? (
+                <select
+                  value={formData.role || 'agent'}
+                  onChange={(e) => setFormData(f => ({ ...f, role: e.target.value as any }))}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="agent">Agent</option>
+                  <option value="tl">Team Lead</option>
+                  <option value="wfm">WFM</option>
+                </select>
+              ) : (
+                <p className="mt-1 text-gray-900 uppercase">{employee.role}</p>
+              )}
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Department</label>
               {isEditable ? (
