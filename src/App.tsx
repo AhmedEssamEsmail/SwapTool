@@ -18,7 +18,7 @@ import LeaveBalances from './pages/LeaveBalances'
 import Unauthorized from './pages/Unauthorized'
 
 // NEW: Headcount pages
-import HeadcountDashboard from './pages/Headcount/HeadcountDashboard'
+// import HeadcountDashboard from './pages/Headcount/HeadcountDashboard'
 import EmployeeDirectory from './pages/Headcount/EmployeeDirectory'
 import EmployeeDetail from './pages/Headcount/EmployeeDetail'
 
@@ -147,7 +147,6 @@ function App() {
           <Route path="/schedule/upload" element={<WFMOnlyRoute><ScheduleUpload /></WFMOnlyRoute>} />
           
           {/* NEW: Headcount routes (TL view, WFM edit) */}
-          <Route path="/headcount" element={<HeadcountRoute><HeadcountDashboard /></HeadcountRoute>} />
           <Route path="/headcount/employees" element={<HeadcountRoute><EmployeeDirectory /></HeadcountRoute>} />
           <Route path="/headcount/employees/:id" element={<HeadcountRoute><EmployeeDetail /></HeadcountRoute>} />
           
