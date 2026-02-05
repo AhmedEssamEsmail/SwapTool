@@ -108,7 +108,7 @@ export default function HeadcountDashboard() {
       </div>
 
       {!canEditHeadcount() && (
-        <div classContact="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700 text-sm">
+<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700 text-sm">
           <strong>View Only Mode:</strong> As a Team Lead, you can view all headcount data but cannot make changes. Contact WFM for modifications.
         </div>
       )}
