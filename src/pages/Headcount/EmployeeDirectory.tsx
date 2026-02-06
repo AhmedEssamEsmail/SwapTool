@@ -226,7 +226,7 @@ export default function EmployeeDirectory() {
       setImportResults(results)
       
       if (results.success > 0) {
-        loadEmployees() // Reload the list
+        loadEmployees()
       }
 
     } catch (error) {
@@ -345,7 +345,7 @@ export default function EmployeeDirectory() {
         </div>
       )}
 
-      {/* Filters - Stack on mobile */}
+      {/* Filters */}
       <div className="bg-white p-3 sm:p-4 rounded-lg shadow space-y-3 sm:space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
@@ -490,7 +490,32 @@ export default function EmployeeDirectory() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {employee.manager_name || '-'}
                     </td>
-                       <div className="flex items-start space-x-3">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {employee.fte_percentage * 100}%
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden divide-y divide-gray-200">
+          {loading ? (
+            [...Array(5)].map((_, i) => (
+              <div key={i} className="p-4">
+                <div className="h-20 bg-gray-100 rounded animate-pulse"></div>
+              </div>
+            ))
+          ) : (
+            employees.map((employee) => (
+              <Link 
+                key={employee.id} 
+                to={`/headcount/employees/${employee.id}`}
+                className="block p-4 hover:bg-gray-50 active:bg-gray-100"
+              >
+                <div className="flex items-start space-x-3">
                   <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-semibold flex-shrink-0">
                     {employee.name.charAt(0).toUpperCase()}
                   </div>
@@ -541,4 +566,4 @@ export default function EmployeeDirectory() {
       </div>
     </div>
   )
-      }
+}
