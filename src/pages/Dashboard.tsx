@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabase'
 import type { SwapRequest, LeaveRequest, User } from '../types'
 import { LEAVE_LABELS, getStatusColor, getStatusLabel } from '../lib/designSystem'
+import { swapRequestsService, leaveRequestsService } from '../services'
+import { formatDate as formatDateUtil } from '../utils'
+import { ROUTES } from '../constants'
 
 interface SwapRequestWithUsers extends SwapRequest {
   requester: User
@@ -32,29 +34,19 @@ export default function Dashboard() {
   const fetchRequests = useCallback(async () => {
     setLoading(true)
     try {
-      // Fetch swap requests
-      let swapQuery = supabase
-        .from('swap_requests')
-        .select(`
-          *,
-          requester:users!swap_requests_requester_id_fkey(*),
-          target_user:users!swap_requests_target_user_id_fkey(*)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5)
+      // Fetch all requests using services
+      const [allSwapRequests, allLeaveRequests] = await Promise.all([
+        swapRequestsService.getSwapRequests(),
+        leaveRequestsService.getLeaveRequests()
+      ])
 
-      if (!isManager) {
-        swapQuery = swapQuery.or(`requester_id.eq.${user!.id},target_user_id.eq.${user!.id}`)
-      }
+      // Filter and sort swap requests
+      let filteredSwaps = isManager 
+        ? allSwapRequests 
+        : allSwapRequests.filter(r => r.requester_id === user!.id || r.target_user_id === user!.id)
 
-      const { data: swapData, error: swapError } = await swapQuery
-
-      if (swapError) throw swapError
-
-      // For managers, sort with pending approvals first
-      let sortedSwapData = swapData || []
       if (isManager) {
-        sortedSwapData = [...sortedSwapData].sort((a, b) => {
+        filteredSwaps = [...filteredSwaps].sort((a, b) => {
           const aPending = a.status.startsWith('pending')
           const bPending = b.status.startsWith('pending')
           if (aPending && !bPending) return -1
@@ -63,30 +55,15 @@ export default function Dashboard() {
         })
       }
 
-      setSwapRequests(sortedSwapData as SwapRequestWithUsers[])
+      setSwapRequests(filteredSwaps.slice(0, 5) as SwapRequestWithUsers[])
 
-      // Fetch leave requests
-      let leaveQuery = supabase
-        .from('leave_requests')
-        .select(`
-          *,
-          user:users!leave_requests_user_id_fkey(*)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5)
+      // Filter and sort leave requests
+      let filteredLeaves = isManager
+        ? allLeaveRequests
+        : allLeaveRequests.filter(r => r.user_id === user!.id)
 
-      if (!isManager) {
-        leaveQuery = leaveQuery.eq('user_id', user!.id)
-      }
-
-      const { data: leaveData, error: leaveError } = await leaveQuery
-
-      if (leaveError) throw leaveError
-
-      // For managers, sort with pending approvals first
-      let sortedLeaveData = leaveData || []
       if (isManager) {
-        sortedLeaveData = [...sortedLeaveData].sort((a, b) => {
+        filteredLeaves = [...filteredLeaves].sort((a, b) => {
           const aPending = a.status.startsWith('pending')
           const bPending = b.status.startsWith('pending')
           if (aPending && !bPending) return -1
@@ -95,7 +72,7 @@ export default function Dashboard() {
         })
       }
 
-      setLeaveRequests(sortedLeaveData as LeaveRequestWithUser[])
+      setLeaveRequests(filteredLeaves.slice(0, 5) as LeaveRequestWithUser[])
     } catch (error) {
       console.error('Error fetching requests:', error)
     } finally {
@@ -104,11 +81,7 @@ export default function Dashboard() {
   }, [user, isManager])
 
   const formatDate = useCallback((dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
+    return formatDateUtil(dateString)
   }, [])
 
   return (
@@ -123,7 +96,7 @@ export default function Dashboard() {
       {/* Action Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
         <button
-          onClick={() => navigate('/swap-requests/create')}
+          onClick={() => navigate(ROUTES.SWAP_REQUESTS_CREATE)}
           className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer text-left"
         >
           <div className="p-5">
@@ -144,7 +117,7 @@ export default function Dashboard() {
         </button>
 
         <button
-          onClick={() => navigate('/leave-requests/create')}
+          onClick={() => navigate(ROUTES.LEAVE_REQUESTS_CREATE)}
           className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer text-left"
         >
           <div className="p-5">
@@ -170,7 +143,7 @@ export default function Dashboard() {
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-base font-medium text-gray-900">Recent Swap Requests</h2>
           <Link
-            to="/swap-requests"
+            to={ROUTES.SWAP_REQUESTS}
             className="text-sm font-medium text-primary-600 hover:text-primary-500"
           >
             View All
@@ -220,7 +193,7 @@ export default function Dashboard() {
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-base font-medium text-gray-900">Recent Leave Requests</h2>
           <Link
-            to="/leave-requests"
+            to={ROUTES.LEAVE_REQUESTS}
             className="text-sm font-medium text-primary-600 hover:text-primary-500"
           >
             View All
