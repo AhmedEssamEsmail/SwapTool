@@ -464,7 +464,7 @@ export default function Schedule() {
   }
 
   return (
-    <div className="space-y-6 w-full min-w-0 overflow-x-hidden">
+    <div className="space-y-6 w-full">
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
@@ -547,7 +547,7 @@ export default function Schedule() {
 
           {/* Schedule grid */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="overflow-x-auto">
               <div className="inline-block min-w-full align-middle">
                 <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0 z-20">

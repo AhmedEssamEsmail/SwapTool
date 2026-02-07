@@ -73,7 +73,7 @@ export default function Layout({ children }: LayoutProps) {
       {/* --- DESKTOP SIDEBAR --- */}
       <aside 
         className={`hidden md:flex md:flex-col md:fixed md:inset-y-0 bg-white border-r border-gray-200 transition-all duration-300 ease-in-out z-30 ${
-          sidebarCollapsed ? 'md:w-20' : 'md:w-64'
+          sidebarCollapsed ? 'md:w-20' : 'md:w-48'
         }`}
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100">
@@ -111,21 +111,21 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* --- MAIN CONTENT AREA --- */}
-      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-48'}`}>
         {/* Header */}
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-8">
+        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
           <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-md">
             <MenuIcon />
           </button>
 
-          <div className="hidden md:block text-sm text-gray-500 font-medium italic">
+          <div className="hidden md:block text-sm text-gray-500 font-medium italic flex-shrink-0">
             Management Portal
           </div>
 
           {user && (
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="hidden sm:block text-right min-w-0 flex-shrink">
-                <p className="text-sm font-semibold text-gray-900 leading-none mb-1 truncate max-w-[120px]">{user.name}</p>
+            <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+              <div className="hidden lg:block text-right flex-shrink-0">
+                <p className="text-sm font-semibold text-gray-900 leading-none mb-1 truncate max-w-[150px]">{user.name}</p>
                 <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold ${ROLE_COLORS[user.role]}`}>
                   {ROLE_LABELS[user.role]}
                 </span>
