@@ -66,6 +66,7 @@ export interface Comment {
   request_type: RequestType
   user_id: string
   content: string
+  is_system?: boolean
   created_at: string
 }
 

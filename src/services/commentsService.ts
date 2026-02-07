@@ -45,6 +45,7 @@ export const commentsService = {
         request_type: requestType,
         user_id: userId,
         content,
+        is_system: true,
       })
       .select('*, users(id, name, email, role)')
       .single()
