@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { LeaveRequest, User } from '../types'
@@ -22,13 +22,7 @@ export default function LeaveRequests() {
 
   const isManager = user?.role === 'tl' || user?.role === 'wfm'
 
-  useEffect(() => {
-    if (user) {
-      fetchRequests()
-    }
-  }, [user, startDate, endDate, leaveType])
-
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     if (!user) return
     setLoading(true)
 
@@ -74,7 +68,13 @@ export default function LeaveRequests() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, isManager, startDate, endDate, leaveType])
+
+  useEffect(() => {
+    if (user) {
+      fetchRequests()
+    }
+  }, [user, fetchRequests])
 
   const clearFilters = () => {
     setStartDate('')
