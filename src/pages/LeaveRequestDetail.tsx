@@ -477,7 +477,7 @@ export default function LeaveRequestDetail() {
               >
                 <div className="flex justify-between items-start mb-1">
                   <span className="text-sm font-medium text-blue-800">
-                    {comment.is_system ? 'System' : comment.user?.name || 'Unknown User'}
+                    {comment.is_system ? 'System' : (comment as any).users?.name || 'Unknown User'}
                   </span>
                   <span className="text-xs text-gray-500">
                     {formatDateTime(comment.created_at)}
