@@ -168,10 +168,10 @@ export default function Dashboard() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {request.requester?.name || 'Unknown'}
+                        {(request as any).requester?.name || 'Unknown'}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        → {request.target_user?.name || 'Unknown'}
+                        → {(request as any).target?.name || 'Unknown'}
                       </p>
                     </div>
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 ${getStatusColor(request.status)}`}>
@@ -218,7 +218,7 @@ export default function Dashboard() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {request.user?.name || 'Unknown'}
+                        {(request as any).users?.name || 'Unknown'}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {LEAVE_LABELS[request.leave_type]}
